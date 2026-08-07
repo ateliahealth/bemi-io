@@ -1,12 +1,14 @@
-FROM --platform=linux/amd64 node:21-bookworm AS base
+FROM node:24-bookworm AS base
 
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-RUN npm install -g pnpm@8.15.9
+# pnpm >=10 refuses to reconcile node_modules without a TTY unless CI is set.
+ENV CI=true
+RUN npm install -g pnpm@10.32.1
 
 WORKDIR /worker
 
-COPY package.json pnpm-lock.yaml ./
+COPY worker/package.json worker/pnpm-lock.yaml ./
 
 ################################################################################
 
@@ -20,27 +22,23 @@ FROM base AS build
 
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 
-COPY . ./
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store mv ./core ../core && cd ../core && pnpm install --frozen-lockfile
+# tsconfig includes ../core/src, so core must sit beside the worker dir.
+COPY core /core
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store cd /core && pnpm install --frozen-lockfile
+
+COPY worker ./
 
 RUN pnpm run build
 
 ################################################################################
 
-FROM base
+FROM node:24-bookworm-slim
 
-RUN apt update && \
-  apt install -y default-jre && \
-  curl -O https://repo1.maven.org/maven2/io/debezium/debezium-server-dist/2.5.0.Final/debezium-server-dist-2.5.0.Final.tar.gz && \
-  tar -xvf debezium-server-dist-2.5.0.Final.tar.gz && \
-  rm debezium-server-dist-2.5.0.Final.tar.gz && \
-  curl -sf https://binaries.nats.dev/nats-io/nats-server/v2@v2.10.9 | sh
+WORKDIR /worker
 
-COPY --from=deps /worker/node_modules /worker/node_modules
-COPY --from=build /worker/dist /worker/dist
+COPY --from=deps /worker/node_modules ./node_modules
+COPY --from=build /worker/dist ./dist
 
-COPY application.properties ./
-COPY debezium.sh ./
-COPY run.sh ./
+USER node
 
-CMD ["sh", "./run.sh"]
+CMD ["node", "dist/worker/src/index.js"]

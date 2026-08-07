@@ -106,6 +106,10 @@ web_modules/
 .env.production.local
 .env.local
 
+# local agent tooling settings
+
+.claude/
+
 # parcel-bundler cache (https://parceljs.org/)
 
 .parcel-cache

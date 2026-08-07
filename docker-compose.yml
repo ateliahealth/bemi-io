@@ -1,0 +1,96 @@
+name: bemi
+
+x-source-env: &source-env
+  DB_HOST: db
+  DB_PORT: "5432"
+  DB_NAME: appdb
+  DB_USER: postgres
+  DB_PASSWORD: postgres
+
+x-destination-env: &destination-env
+  DESTINATION_DB_HOST: db
+  DESTINATION_DB_PORT: "5432"
+  DESTINATION_DB_NAME: audit
+  DESTINATION_DB_USER: postgres
+  DESTINATION_DB_PASSWORD: postgres
+
+x-worker-image: &worker-image
+  image: bemi-worker:local
+  build:
+    context: .
+    dockerfile: worker/Dockerfile
+
+services:
+  db:
+    image: postgres:15
+    command:
+      - postgres
+      - -c
+      - wal_level=logical
+      - -c
+      - max_replication_slots=10
+      - -c
+      - max_wal_senders=10
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: appdb
+    ports:
+      - "55432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./compose/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d appdb"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  nats:
+    image: nats:2.10-alpine
+    restart: unless-stopped
+    command: ["-js", "-sd", "/nats-store", "-m", "8222"]
+    volumes:
+      - nats-store:/nats-store
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8222/healthz || exit 1"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  stream-setup:
+    <<: *worker-image
+    command: ["node", "dist/worker/src/reset.js"]
+    environment:
+      <<: [*source-env, *destination-env]
+      NATS_URL: nats://nats:4222
+      BEMI_RESET_SLOT: "${BEMI_RESET_SLOT:-false}"
+    depends_on:
+      db: { condition: service_healthy }
+      nats: { condition: service_healthy }
+
+  debezium:
+    image: bemi-debezium:local
+    build:
+      context: .
+      dockerfile: debezium/Dockerfile
+    restart: unless-stopped
+    environment:
+      <<: *source-env
+      NATS_URL: nats://nats:4222
+    depends_on:
+      stream-setup: { condition: service_completed_successfully }
+
+  worker:
+    <<: *worker-image
+    restart: unless-stopped
+    command: ["node", "dist/worker/src/index.js"]
+    environment:
+      <<: *destination-env
+      NATS_URL: nats://nats:4222
+      MIKRO_ORM_DEBUG: "${MIKRO_ORM_DEBUG:-false}"
+    depends_on:
+      stream-setup: { condition: service_completed_successfully }
+
+volumes:
+  db-data:
+  nats-store:
