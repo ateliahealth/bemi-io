@@ -196,3 +196,6 @@ pnpm-lock.yaml
 /docs/build
 # Generated files
 /docs/.cache-loader
+
+# Turborepo
+.turbo

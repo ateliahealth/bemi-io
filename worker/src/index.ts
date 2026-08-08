@@ -4,8 +4,7 @@ import http from 'http';
 import { AckPolicy, DeliverPolicy } from 'nats';
 import { MikroORM } from '@mikro-orm/postgresql';
 
-import { connectJetstream, buildConsumer } from '../../core/src/nats'
-import { runIngestionLoop } from '../../core/src/ingestion'
+import { connectJetstream, buildConsumer, runIngestionLoop } from '@bemi-db/core'
 
 import mikroOrmConfig from "../mikro-orm.config"
 

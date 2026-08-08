@@ -2,8 +2,7 @@
 // modified by Atelia Health, 2026. Licensed under SSPL-1.0; see LICENSE.
 import { MikroORM } from '@mikro-orm/postgresql';
 
-import { logger } from '../../core/src/logger'
-import { connectJetstream, ensureDebeziumStream } from '../../core/src/nats'
+import { logger, connectJetstream, ensureDebeziumStream } from '@bemi-db/core'
 import mikroOrmConfig from "../mikro-orm.config"
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))

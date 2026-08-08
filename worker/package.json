@@ -2,6 +2,7 @@
   "name": "@bemi-db/worker",
   "private": true,
   "dependencies": {
+    "@bemi-db/core": "workspace:*",
     "@mikro-orm/core": "^6.1.12",
     "@mikro-orm/migrations": "^6.1.12",
     "@mikro-orm/postgresql": "^6.1.12",
@@ -15,8 +16,8 @@
     "typescript": "^5.5.4"
   },
   "scripts": {
-    "build": "pnpm tsc",
-    "typecheck": "pnpm tsc --noEmit",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
     "up:worker": "sleep 5 && LOG_LEVEL=DEBUG pnpm ts-node src/index.ts",
     "up:nats": "nats-server -js",
     "up:debezium": "sleep 1 && pnpm ts-node src/reset.ts && ./debezium.sh"
