@@ -1,12 +1,4 @@
-import {
-  connect,
-  ConsumerConfig,
-  DiscardPolicy,
-  JSONCodec,
-  NatsConnection,
-  RetentionPolicy,
-  StorageType,
-} from 'nats'
+import { connect, ConsumerConfig, DiscardPolicy, JSONCodec, NatsConnection, RetentionPolicy, StorageType } from 'nats'
 
 import { logger } from './logger'
 
@@ -95,8 +87,7 @@ export const ensureDebeziumStream = async ({
   // past them, so they are unrecoverable. Update in place instead. Storage and
   // retention are rejected by the server on an existing stream, so they can
   // only be changed by recreating it.
-  const immutableChanged =
-    existing.config.storage !== config.storage || existing.config.retention !== config.retention
+  const immutableChanged = existing.config.storage !== config.storage || existing.config.retention !== config.retention
 
   if (immutableChanged) {
     if (existing.state.messages > 0) {
