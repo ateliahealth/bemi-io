@@ -1,4 +1,3 @@
-import fs from 'fs'
 import { MikroORM } from '@mikro-orm/postgresql';
 
 import { logger } from '../../core/src/logger'
@@ -40,15 +39,9 @@ const main = (async () => {
       END $$;
     `)
     await orm.close()
-    logger.info(`BEMI_RESET_SLOT=true - dropped replication slot "${SLOT_NAME}" and offsets`)
-
-    try {
-      fs.unlinkSync('./debezium-server/offsets.dat')
-    } catch (e: any) {
-      if (e.code !== 'ENOENT') {
-        throw e
-      }
-    }
+    // Debezium's offsets.dat lives in the debezium container, not this one;
+    // debezium.sh removes it under the same flag before starting the server.
+    logger.info(`BEMI_RESET_SLOT=true - dropped replication slot "${SLOT_NAME}"`)
   } else {
     logger.info(`Preserving replication slot "${SLOT_NAME}" - Debezium resumes from its confirmed position`)
   }

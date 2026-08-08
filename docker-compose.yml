@@ -35,7 +35,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: appdb
     ports:
-      - "55432:5432"
+      - "127.0.0.1:55432:5432"
     volumes:
       - db-data:/var/lib/postgresql/data
       - ./compose/init:/docker-entrypoint-initdb.d:ro
@@ -77,6 +77,7 @@ services:
     environment:
       <<: *source-env
       NATS_URL: nats://nats:4222
+      BEMI_RESET_SLOT: "${BEMI_RESET_SLOT:-false}"
     depends_on:
       stream-setup: { condition: service_completed_successfully }
 

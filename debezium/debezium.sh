@@ -11,4 +11,7 @@ PROPERTIES="${PROPERTIES//DB_PASSWORD/$DB_PASSWORD}" &&
 PROPERTIES="${PROPERTIES//NATS_URL/$NATS_URL}" &&
 PROPERTIES="${PROPERTIES//BEMI_SLOT_NAME/$BEMI_SLOT_NAME}" &&
 echo "${PROPERTIES}" > ./debezium-server/conf/application.properties &&
+# reset.js drops the slot from another container; the connector offsets live
+# here, and resuming from them against a recreated slot fails.
+if [ "${BEMI_RESET_SLOT}" = "true" ]; then rm -f ./debezium-server/offsets.dat; fi &&
 cd debezium-server && ./run.sh
