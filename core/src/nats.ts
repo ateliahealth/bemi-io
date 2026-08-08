@@ -12,12 +12,13 @@ import { logger } from './logger'
 
 const JSON_CODEC = JSONCodec()
 
-// Hard cap on the on-disk stream size; oldest messages are discarded past it.
+// Hard cap on the on-disk stream size. Past it, DiscardPolicy.New rejects the
+// publish rather than dropping anything already accepted.
 const DEFAULT_STREAM_MAX_BYTES = 1024 * 1024 * 1024 // 1 GiB
-// Retain at most this much history. The worker normally acks within seconds,
-// so this only matters as a buffer if the worker is briefly down — and it
-// bounds how much the stream can grow regardless of consumer progress.
-const DEFAULT_STREAM_MAX_AGE_NS = 6 * 60 * 60 * 1e9 // 6 hours, in nanoseconds
+// No age limit: under Limits retention, eviction ignores consumer progress, so
+// any max_age silently drops un-acked messages once the worker is down that
+// long. Growth is bounded by max_bytes instead.
+const DEFAULT_STREAM_MAX_AGE_NS = 0
 
 export const connectJetstream = (host: string) => {
   return connect({ servers: host })
@@ -36,9 +37,16 @@ export const connectJetstream = (host: string) => {
  * Fix: keep Limits retention — the worker consumes with `AckPolicy.All`,
  * which WorkQueue retention rejects ("workqueue stream requires explicit
  * ack") — but move the data to **File storage** (off-heap) and bound it with
- * `max_bytes` + `max_age` + DiscardOld. File storage keeps RAM to a small
- * index, and the size/age caps stop unbounded growth. The audit `changes`
- * table is the durable record; the stream is only a transport buffer.
+ * `max_bytes`. File storage keeps RAM to a small index.
+ *
+ * Discard policy is **New**, not Old. Under Limits retention eviction ignores
+ * consumer progress, so DiscardOld silently drops changes the worker has not
+ * persisted yet — and Debezium has already advanced the replication slot past
+ * them, making them unrecoverable. DiscardNew instead rejects the publish, so
+ * Debezium fails the batch, does not commit its offset, and the change stays
+ * in the source WAL until the worker catches up. That trades silent data loss
+ * for visible back-pressure and WAL growth, which needs alerting on write
+ * staleness to be safe.
  *
  * Reused across boots so undelivered messages survive a restart; the retention
  * config is re-applied in place on every boot.
@@ -63,7 +71,7 @@ export const ensureDebeziumStream = async ({
     subjects,
     retention: RetentionPolicy.Limits,
     storage: StorageType.File,
-    discard: DiscardPolicy.Old,
+    discard: DiscardPolicy.New,
     max_bytes: maxBytes,
     max_age: maxAgeNs,
     num_replicas: 1,
@@ -84,17 +92,32 @@ export const ensureDebeziumStream = async ({
 
   // Deleting the stream discards every message Debezium already published but
   // the worker has not persisted yet - and the replication slot has advanced
-  // past them, so they are unrecoverable. Update in place instead. Storage type
-  // is the one field JetStream cannot change on an existing stream.
-  if (existing.config.storage !== config.storage) {
-    logger.info(`Stream "${stream}" storage is ${existing.config.storage}, recreating as ${config.storage}...`)
+  // past them, so they are unrecoverable. Update in place instead. Storage and
+  // retention are rejected by the server on an existing stream, so they can
+  // only be changed by recreating it.
+  const immutableChanged =
+    existing.config.storage !== config.storage || existing.config.retention !== config.retention
+
+  if (immutableChanged) {
+    if (existing.state.messages > 0) {
+      throw new Error(
+        `Stream "${stream}" needs recreating (storage=${existing.config.storage}, retention=${existing.config.retention}) ` +
+          `but holds ${existing.state.messages} undelivered messages. Refusing to discard them; drain or delete it manually.`,
+      )
+    }
+    logger.info(`Recreating empty stream "${stream}" as ${config.storage}/${config.retention}...`)
     await jetstreamManager.streams.delete(stream)
     await jetstreamManager.streams.add(config)
     return
   }
 
+  // `name`, `storage` and `retention` are not part of StreamUpdateConfig; the
+  // client merges whatever it is given into the existing config and the server
+  // rejects the request if they differ.
+  const { name: _name, storage: _storage, retention: _retention, ...updatable } = config
+
   logger.info(`Reusing stream "${stream}" (${existing.state.messages} pending); applying retention config...`)
-  await jetstreamManager.streams.update(stream, config)
+  await jetstreamManager.streams.update(stream, updatable)
 }
 
 export const buildConsumer = async ({
