@@ -16,11 +16,7 @@ COPY worker/package.json worker/package.json
 
 FROM base AS deps
 
-# The default isolated linker puts worker's deps behind symlinks into
-# /repo/node_modules/.pnpm, which do not survive being copied to a different
-# path. Hoisted gives a self-contained directory the final stage can relocate.
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-  pnpm install --prod --frozen-lockfile --filter @bemi-db/worker --config.node-linker=hoisted
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --prod --frozen-lockfile
 
 ################################################################################
 
@@ -29,8 +25,13 @@ FROM base AS build
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 
 # worker/tsconfig.json includes ../core/src, so core must stay a sibling of
-# worker; that is what pushes tsc's rootDir up and produces the dist/worker +
-# dist/core layout the runtime commands and mikro-orm.config.ts expect.
+# worker. That inclusion is what pushes tsc's inferred rootDir up a level and
+# produces the doubled dist/worker/src + dist/core/src layout, which is
+# referenced in three places outside the compiler: the Helm chart's container
+# commands, the docker-compose service commands, and the entities/migrations
+# paths in worker/mikro-orm.config.ts. Any tsconfig change that alters that
+# inference silently relocates the output - the build still succeeds and the
+# container then fails to start. Grep all three before changing tsconfig.
 COPY core core
 COPY worker worker
 
