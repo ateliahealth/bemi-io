@@ -1,3 +1,5 @@
+// Part of a fork of Bemi (https://github.com/BemiHQ/bemi-io),
+// modified by Atelia Health, 2026. Licensed under SSPL-1.0; see LICENSE.
 import http from 'http';
 import { AckPolicy, DeliverPolicy } from 'nats';
 import { MikroORM } from '@mikro-orm/postgresql';
@@ -29,7 +31,7 @@ const serveHealth = () => {
     .listen(HEALTH_PORT)
 }
 
-const main = (async () => {
+;(async () => {
   serveHealth()
 
   const jetstreamConnection = await connectJetstream(NATS_URL);

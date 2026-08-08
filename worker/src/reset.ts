@@ -1,3 +1,5 @@
+// Part of a fork of Bemi (https://github.com/BemiHQ/bemi-io),
+// modified by Atelia Health, 2026. Licensed under SSPL-1.0; see LICENSE.
 import { MikroORM } from '@mikro-orm/postgresql';
 
 import { logger } from '../../core/src/logger'
@@ -26,7 +28,7 @@ const connectOrm = async () => {
   }
 }
 
-const main = (async () => {
+;(async () => {
   // Dropping the slot makes Debezium recreate it at the CURRENT LSN, so every
   // restart silently loses every change committed since the last confirmed
   // position. Keeping it means Debezium resumes exactly where it stopped; the

@@ -1,4 +1,8 @@
+// Part of a fork of Bemi (https://github.com/BemiHQ/bemi-io),
+// modified by Atelia Health, 2026. Licensed under SSPL-1.0; see LICENSE.
 process.env.LOG_LEVEL = 'INFO'
+
+import { beforeAll, describe, expect, test, vi } from 'vitest'
 
 import { stitchFetchedRecords } from '../stitching'
 import { FetchedRecord, MESSAGE_PREFIX_CONTEXT, MESSAGE_PREFIX_HEARTBEAT } from '../fetched-record'
@@ -11,7 +15,11 @@ const findFetchedRecord = (fetchedRecords: FetchedRecord[], streamSequence: numb
 
 describe('stitchFetchedRecords', () => {
   beforeAll(() => {
-    jest.spyOn(global, 'Date').mockImplementation(() => MOCKED_DATE)
+    // A plain function, not an arrow: the code under test calls `new Date(ms)`,
+    // and the fixtures expect the argument to be ignored in favour of the mock.
+    vi.spyOn(global, 'Date').mockImplementation(function () {
+      return MOCKED_DATE
+    } as unknown as DateConstructor)
   })
 
   describe('when messages in the same batch', () => {

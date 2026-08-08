@@ -1,0 +1,14 @@
+# Part of a fork of Bemi (https://github.com/BemiHQ/bemi-io),
+# modified by Atelia Health, 2026. Licensed under SSPL-1.0; see LICENSE.
+packages:
+  - core
+  - worker
+
+# Hoisted rather than pnpm's default isolated layout, and set here rather than
+# passed to the image build, so local and image installs are identical.
+#
+# The image needs it: the final stage copies node_modules to a different path,
+# and the isolated layout's symlinks into node_modules/.pnpm do not survive
+# that move. Setting it only in the Dockerfile would work, but it reintroduces
+# the gap where a dependency resolves locally and not in the container.
+nodeLinker: hoisted
