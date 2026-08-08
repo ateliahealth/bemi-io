@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Part of a fork of Bemi (https://github.com/BemiHQ/bemi-io),
+# modified by Atelia Health, 2026. Licensed under SSPL-1.0; see LICENSE.
 # SSPL-1.0 section 5(a) requires modified files to carry a prominent notice
 # that they were changed. `add` inserts the notice, `check` fails if it is
 # missing; the pre-commit hook runs `add` over staged files so a new file or a
@@ -17,9 +19,10 @@ notice_body() {
 
 prefix_for() {
   case "$1" in
-    *.ts | *.mts | *.js | *.mjs) printf '//' ;;
-    *.sh | *.properties | *.yml | *.yaml | *Dockerfile) printf '#' ;;
-    *) printf '' ;;
+    *.ts | *.mts | *.js | *.mjs) printf '%s' '//' ;;
+    *.sql) printf '%s' '--' ;;
+    *.sh | *.properties | *.yml | *.yaml | *Dockerfile | .githooks/*) printf '%s' '#' ;;
+    *) printf '%s' '' ;;
   esac
 }
 
@@ -27,8 +30,15 @@ prefix_for() {
 # docs site are excluded: no comment syntax, or not ours to annotate.
 target_files() {
   git ls-files -- \
-    '*.ts' '*.mts' '*.js' '*.mjs' '*.sh' '*.properties' '*Dockerfile' \
-    ':!:docs/**' ':!:**/dist/**'
+    '*.ts' '*.mts' '*.js' '*.mjs' '*.sh' '*.sql' '*.properties' '*.yml' '*.yaml' \
+    '*Dockerfile' '.githooks/*' \
+    ':!:docs/**' ':!:**/dist/**' ':!:pnpm-lock.yaml' ':!:*/pnpm-lock.yaml'
+}
+
+# Only the top of the file counts. A bare substring search would match this
+# script's own MARKER assignment and quietly certify it as already annotated.
+has_notice() {
+  head -n 4 "$1" | grep -q "$MARKER"
 }
 
 # Only files this fork actually diverges from upstream on may claim to be
@@ -75,11 +85,20 @@ while IFS= read -r file; do
   [ -n "$file" ] || continue
   [ -f "$file" ] || continue
   printf '%s\n' "$eligible" | grep -qxF "$file" || continue
-  grep -q "$MARKER" "$file" && continue
+  has_notice "$file" && continue
   prefix="$(prefix_for "$file")"
   [ -n "$prefix" ] || continue
 
   if [ "$MODE" = "add" ] || [ "$MODE" = "backfill" ]; then
+    # `git add` below stages the whole working-tree file. If the file also has
+    # unstaged edits, those would ride along into the commit, silently undoing
+    # a deliberate partial stage. Refuse rather than decide for the author.
+    if [ "$MODE" = "add" ] && ! git diff --quiet -- "$file"; then
+      echo "error: $file needs a licence notice but has unstaged changes." >&2
+      echo "       Adding it here would also commit those. Run 'pnpm run license:add'," >&2
+      echo "       then stage the file, or stage it fully first." >&2
+      exit 1
+    fi
     add_to "$file" "$prefix"
     git add "$file"
     echo "notice added: $file"
