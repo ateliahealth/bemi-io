@@ -12,6 +12,10 @@ PROPERTIES="${PROPERTIES//NATS_URL/$NATS_URL}" &&
 PROPERTIES="${PROPERTIES//BEMI_SLOT_NAME/$BEMI_SLOT_NAME}" &&
 echo "${PROPERTIES}" > ./debezium-server/conf/application.properties &&
 # reset.js drops the slot from another container; the connector offsets live
-# here, and resuming from them against a recreated slot fails.
-if [ "${BEMI_RESET_SLOT}" = "true" ]; then rm -f ./debezium-server/offsets.dat; fi &&
+# here, and resuming from them against a recreated slot fails. The marker
+# keeps this to once per container: stream-setup is one-shot, so on an
+# in-place restart the slot still exists and wiping offsets would replay it.
+if [ "${BEMI_RESET_SLOT}" = "true" ] && [ ! -f ./debezium-server/.reset-applied ]; then
+  rm -f ./debezium-server/offsets.dat && touch ./debezium-server/.reset-applied
+fi &&
 cd debezium-server && ./run.sh
