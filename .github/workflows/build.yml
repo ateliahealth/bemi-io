@@ -10,6 +10,12 @@ on:
 permissions:
   contents: read
 
+# Secrets, not vars: this repo is public and vars are unmasked in job logs.
+env:
+  TURBO_API: ${{ secrets.TURBO_API }}
+  TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
+  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+
 jobs:
   test-core:
     name: Test core
@@ -65,8 +71,26 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v4
 
-      - name: Run the gate
-        run: ./scripts/compose-gate.sh
+      - name: Stand up the pipeline
+        run: ./scripts/compose-gate.sh setup
+
+      - name: Changes propagate with before/after images
+        run: ./scripts/compose-gate.sh baseline
+
+      - name: Writes during worker downtime still land
+        run: ./scripts/compose-gate.sh downtime
+
+      - name: Control - a slot reset really does lose them
+        run: ./scripts/compose-gate.sh negative-control
+
+      - name: Back-pressure holds the replication slot
+        run: ./scripts/compose-gate.sh backpressure
+
+      - name: Raising the cap replays every row exactly once
+        run: ./scripts/compose-gate.sh recovery
+
+      - name: Each service recovers from a kill
+        run: ./scripts/compose-gate.sh kill-restart
 
       - name: Service logs on failure
         if: failure()

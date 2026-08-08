@@ -199,3 +199,6 @@ pnpm-lock.yaml
 
 # Turborepo
 .turbo
+
+# Compose gate step state
+.gate
