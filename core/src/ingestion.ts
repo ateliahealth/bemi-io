@@ -87,6 +87,7 @@ export const runIngestionLoop = async ({
   onAcked?: (ackedStreamSequence: number) => Promise<void>
 }) => {
   let lastStreamSequence: number | null = null
+  let pendingReleaseSequence: number | null = null
   let fetchedRecordBuffer = new FetchedRecordBuffer()
 
   // eslint-disable-next-line no-constant-condition
@@ -147,17 +148,23 @@ export const runIngestionLoop = async ({
     if (ackStreamSequence) {
       logger.debug(`Acking ${ackStreamSequence}...`)
       natsMessageBySequence[ackStreamSequence]?.ack()
+      pendingReleaseSequence = ackStreamSequence
+    }
 
-      // Under Limits retention an ack does not reclaim anything, so a stream
-      // that fills stays full and DiscardPolicy.New then rejects every publish
-      // permanently. Releasing what is already durable in Postgres is what
-      // keeps back-pressure temporary rather than terminal.
-      if (onAcked) {
-        try {
-          await onAcked(ackStreamSequence)
-        } catch (e) {
-          logger.info(`Error while releasing acked messages: ${e}`)
-        }
+    // Under Limits retention an ack does not reclaim anything, so a stream that
+    // fills stays full and DiscardPolicy.New then rejects every publish
+    // permanently. Releasing what is already durable in Postgres is what keeps
+    // back-pressure temporary rather than terminal.
+    //
+    // Retried outside the ack branch on purpose: once the stream is full there
+    // are no further publishes, so no further acks, so a release that only ran
+    // on a fresh ack would never run again after a single failure.
+    if (onAcked && pendingReleaseSequence) {
+      try {
+        await onAcked(pendingReleaseSequence)
+        pendingReleaseSequence = null
+      } catch (e) {
+        logger.info(`Error while releasing acked messages, will retry: ${e}`)
       }
     }
 
