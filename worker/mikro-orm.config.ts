@@ -16,7 +16,9 @@ const mikroOrmConfig: Options = {
   user: DB_USER,
   password: DB_PASSWORD,
   highlighter: new SqlHighlighter(),
-  debug: true,
+  // Query logging includes bound parameters, i.e. the full row payload (PHI)
+  // on every insert into `changes`, which then lands in Cloud Logging.
+  debug: process.env.MIKRO_ORM_DEBUG === 'true',
   allowGlobalContext: true,
   entities: ['./dist/core/src/entities/**/*.js'],
   entitiesTs: ['../core/src/entities/**/*.ts'],

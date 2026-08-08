@@ -20,7 +20,7 @@
   "homepage": "https://github.com/BemiHQ/bemi#readme",
   "devDependencies": {
     "@types/jest": "^29.5.12",
-    "@types/node": "^20.11.15",
+    "@types/node": "^24.10.1",
     "@typescript-eslint/eslint-plugin": "^7.11.0",
     "@typescript-eslint/parser": "^7.11.0",
     "eslint": "^8.57.0",
@@ -35,7 +35,7 @@
     "@mikro-orm/core": "^6.1.12",
     "@mikro-orm/migrations": "^6.1.12",
     "@mikro-orm/postgresql": "^6.1.12",
-    "nats": "^2.19.0"
+    "nats": "^2.29.3"
   },
   "jest": {
     "moduleFileExtensions": [

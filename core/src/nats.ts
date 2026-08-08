@@ -40,8 +40,8 @@ export const connectJetstream = (host: string) => {
  * index, and the size/age caps stop unbounded growth. The audit `changes`
  * table is the durable record; the stream is only a transport buffer.
  *
- * Recreated on every boot (alongside the replication-slot reset) so the
- * desired config is always applied and any stale/bloated stream is cleared.
+ * Reused across boots so undelivered messages survive a restart; the retention
+ * config is re-applied in place on every boot.
  */
 export const ensureDebeziumStream = async ({
   connection,
@@ -58,18 +58,7 @@ export const ensureDebeziumStream = async ({
 }) => {
   const jetstreamManager = await connection.jetstreamManager()
 
-  try {
-    await jetstreamManager.streams.info(stream)
-    logger.info(`Deleting existing stream "${stream}" to reset retention config...`)
-    await jetstreamManager.streams.delete(stream)
-  } catch (e) {
-    if (e instanceof Error && e.message !== 'stream not found') throw e
-  }
-
-  logger.info(
-    `Creating stream "${stream}" (File storage, Limits retention, max_bytes=${maxBytes}, max_age=${maxAgeNs}ns)...`,
-  )
-  await jetstreamManager.streams.add({
+  const config = {
     name: stream,
     subjects,
     retention: RetentionPolicy.Limits,
@@ -78,7 +67,34 @@ export const ensureDebeziumStream = async ({
     max_bytes: maxBytes,
     max_age: maxAgeNs,
     num_replicas: 1,
-  })
+  }
+
+  let existing
+  try {
+    existing = await jetstreamManager.streams.info(stream)
+  } catch (e) {
+    if (e instanceof Error && e.message !== 'stream not found') throw e
+  }
+
+  if (!existing) {
+    logger.info(`Creating stream "${stream}" (File storage, max_bytes=${maxBytes}, max_age=${maxAgeNs}ns)...`)
+    await jetstreamManager.streams.add(config)
+    return
+  }
+
+  // Deleting the stream discards every message Debezium already published but
+  // the worker has not persisted yet - and the replication slot has advanced
+  // past them, so they are unrecoverable. Update in place instead. Storage type
+  // is the one field JetStream cannot change on an existing stream.
+  if (existing.config.storage !== config.storage) {
+    logger.info(`Stream "${stream}" storage is ${existing.config.storage}, recreating as ${config.storage}...`)
+    await jetstreamManager.streams.delete(stream)
+    await jetstreamManager.streams.add(config)
+    return
+  }
+
+  logger.info(`Reusing stream "${stream}" (${existing.state.messages} pending); applying retention config...`)
+  await jetstreamManager.streams.update(stream, config)
 }
 
 export const buildConsumer = async ({
