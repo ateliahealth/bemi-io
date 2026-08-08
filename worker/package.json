@@ -3,23 +3,26 @@
   "private": true,
   "dependencies": {
     "@bemi-db/core": "workspace:*",
-    "@mikro-orm/core": "^6.1.12",
-    "@mikro-orm/migrations": "^6.1.12",
-    "@mikro-orm/postgresql": "^6.1.12",
-    "@mikro-orm/sql-highlighter": "^1.0.1",
-    "nats": "^2.29.3"
+    "@mikro-orm/core": "catalog:",
+    "@mikro-orm/migrations": "catalog:",
+    "@mikro-orm/postgresql": "catalog:",
+    "@mikro-orm/sql-highlighter": "catalog:",
+    "nats": "catalog:"
   },
   "devDependencies": {
-    "@types/node": "^24.10.1",
+    "@types/node": "catalog:",
     "concurrently": "^8.2.2",
     "ts-node": "^10.9.2",
-    "typescript": "^5.5.4"
+    "typescript": "catalog:"
   },
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "up:worker": "sleep 5 && LOG_LEVEL=DEBUG pnpm ts-node src/index.ts",
     "up:nats": "nats-server -js",
-    "up:debezium": "sleep 1 && pnpm ts-node src/reset.ts && ./debezium.sh"
+    "up:debezium": "sleep 1 && pnpm ts-node src/reset.ts && ./debezium.sh",
+    "lint": "oxlint src mikro-orm.config.ts",
+    "format": "prettier --write --ignore-path ../.prettierignore src mikro-orm.config.ts",
+    "format:check": "prettier --check --ignore-path ../.prettierignore src mikro-orm.config.ts"
   }
 }

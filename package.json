@@ -3,17 +3,21 @@
   "private": true,
   "packageManager": "pnpm@10.32.1",
   "scripts": {
-    "prepare": "git config core.hooksPath .githooks 2>/dev/null || true",
+    "prepare": "husky || true",
     "license:add": "./scripts/license-notice.sh backfill",
     "license:check": "./scripts/license-notice.sh check",
-    "lint": "oxlint core/src worker/src worker/mikro-orm.config.ts",
-    "lint:fix": "pnpm run lint --fix",
+    "lint": "turbo run lint",
+    "lint:fix": "turbo run lint -- --fix",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
-    "build": "turbo run build"
+    "build": "turbo run build",
+    "format:check": "turbo run format:check"
   },
   "devDependencies": {
     "oxlint": "^1.77.0",
-    "turbo": "^2.9.5"
+    "turbo": "^2.9.5",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.1.0",
+    "prettier": "^3.3.0"
   }
 }

@@ -1,0 +1,2 @@
+./scripts/license-notice.sh add
+pnpm exec lint-staged
