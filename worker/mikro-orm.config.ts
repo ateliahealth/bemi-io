@@ -1,3 +1,5 @@
+// Part of a fork of Bemi (https://github.com/BemiHQ/bemi-io),
+// modified by Atelia Health, 2026. Licensed under SSPL-1.0; see LICENSE.
 import { Options, PostgreSqlDriver } from "@mikro-orm/postgresql";
 import { Migrator } from '@mikro-orm/migrations';
 import { SqlHighlighter } from "@mikro-orm/sql-highlighter";

@@ -2,6 +2,9 @@
   "name": "bemi-io",
   "private": true,
   "scripts": {
+    "prepare": "git config core.hooksPath .githooks 2>/dev/null || true",
+    "license:add": "./scripts/license-notice.sh backfill",
+    "license:check": "./scripts/license-notice.sh check",
     "lint": "oxlint core/src worker/src worker/mikro-orm.config.ts",
     "lint:fix": "pnpm run lint --fix",
     "test": "pnpm --filter @bemi-db/core run test",

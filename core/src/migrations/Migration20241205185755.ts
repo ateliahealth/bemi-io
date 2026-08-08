@@ -1,3 +1,5 @@
+// Part of a fork of Bemi (https://github.com/BemiHQ/bemi-io),
+// modified by Atelia Health, 2026. Licensed under SSPL-1.0; see LICENSE.
 import { Migration } from '@mikro-orm/migrations'
 
 export class Migration20241205185755 extends Migration {

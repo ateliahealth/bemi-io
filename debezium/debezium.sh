@@ -1,4 +1,6 @@
 #!/bin/bash
+# Part of a fork of Bemi (https://github.com/BemiHQ/bemi-io),
+# modified by Atelia Health, 2026. Licensed under SSPL-1.0; see LICENSE.
 #
 NATS_URL="${NATS_URL:-nats://127.0.0.1:4222}" &&
 BEMI_SLOT_NAME="${BEMI_SLOT_NAME:-bemi_local}" &&

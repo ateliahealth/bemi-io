@@ -177,3 +177,14 @@ Alternatively, [sign up](https://dashboard.bemi.io/log-in?ref=gh) with your GitH
 ## License
 
 Distributed under the terms of the [SSPL-1.0 License](/LICENSE). If you need to modify and distribute the code, please release it to contribute back to the open-source community.
+
+This repository is a fork of [BemiHQ/bemi-io](https://github.com/BemiHQ/bemi-io), modified by Atelia Health. Section 5(a) of the SSPL requires modified files to carry a notice saying so, so every file that diverges from upstream begins with one.
+
+`pnpm install` points `core.hooksPath` at `.githooks`, and the pre-commit hook adds the notice to any staged file missing it. To apply or verify by hand:
+
+```sh
+pnpm run license:add     # add the notice to files that diverge from upstream
+pnpm run license:check   # fail if any of them is missing it (also runs in CI)
+```
+
+`license:check` compares against `upstream/main`, so it only ever asks for a notice on files this fork actually changed. Add the remote with `git remote add upstream https://github.com/BemiHQ/bemi-io.git`.
