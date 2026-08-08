@@ -95,8 +95,9 @@ while IFS= read -r file; do
     # a deliberate partial stage. Refuse rather than decide for the author.
     if [ "$MODE" = "add" ] && ! git diff --quiet -- "$file"; then
       echo "error: $file needs a licence notice but has unstaged changes." >&2
-      echo "       Adding it here would also commit those. Run 'pnpm run license:add'," >&2
-      echo "       then stage the file, or stage it fully first." >&2
+      echo "       Staging it here would commit those too. Either:" >&2
+      echo "         - stage the rest of the file and commit again, or" >&2
+      echo "         - run 'pnpm run license:add', then 'git add $file'" >&2
       exit 1
     fi
     add_to "$file" "$prefix"
