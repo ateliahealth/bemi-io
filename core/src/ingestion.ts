@@ -92,7 +92,7 @@ export const runIngestionLoop = async ({
   // eslint-disable-next-line no-constant-condition
   while (true) {
     // Fetching
-    logger.info('Fetching...')
+    logger.debug('Fetching...')
     const { natsMessageBySequence, pendingMessageCount } = await fetchNatsMessages({
       consumer,
       fetchBatchSize,
