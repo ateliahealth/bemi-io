@@ -64,6 +64,7 @@ services:
       <<: [*source-env, *destination-env]
       NATS_URL: nats://nats:4222
       BEMI_RESET_SLOT: "${BEMI_RESET_SLOT:-false}"
+      BEMI_STREAM_MAX_BYTES: "${BEMI_STREAM_MAX_BYTES:-}"
     depends_on:
       db: { condition: service_healthy }
       nats: { condition: service_healthy }

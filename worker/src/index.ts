@@ -45,8 +45,19 @@ const main = (async () => {
     },
   });
 
+  const jetstreamManager = await jetstreamConnection.jetstreamManager()
+
   const orm = await MikroORM.init(mikroOrmConfig)
   await orm.getMigrator().up();
 
-  await runIngestionLoop({ orm, consumer, onTick: () => { lastTickAt = Date.now() } })
+  await runIngestionLoop({
+    orm,
+    consumer,
+    onTick: () => { lastTickAt = Date.now() },
+    // `seq` purges up to but not including it, so acked messages are released
+    // and the stream only holds what is not yet durable in the audit database.
+    onAcked: async (ackedStreamSequence) => {
+      await jetstreamManager.streams.purge('DebeziumStream', { seq: ackedStreamSequence + 1 })
+    },
+  })
 })()
