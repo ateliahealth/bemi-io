@@ -9,6 +9,9 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 const SLOT_NAME = process.env.BEMI_SLOT_NAME || 'bemi_local'
 const RESET_SLOT = process.env.BEMI_RESET_SLOT === 'true'
 const NATS_URL = process.env.NATS_URL || 'nats://127.0.0.1:4222'
+// Bounds how far Debezium can publish ahead of the worker, so it is the ceiling
+// on what a lost stream costs. Must fit the volume backing the JetStream store.
+const STREAM_MAX_BYTES = Number(process.env.BEMI_STREAM_MAX_BYTES) || undefined
 const MAX_ATTEMPTS = 30
 
 const connectOrm = async () => {
@@ -60,6 +63,7 @@ const main = (async () => {
         connection: jetstreamConnection,
         stream: 'DebeziumStream',
         subjects: ['bemi', '__debezium-heartbeat.*'],
+        maxBytes: STREAM_MAX_BYTES,
       })
       break
     } catch (e: any) {

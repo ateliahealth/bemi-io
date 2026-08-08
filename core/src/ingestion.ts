@@ -75,6 +75,7 @@ export const runIngestionLoop = async ({
   useBuffer = false,
   changeAttributesOverride = (changeAttributes: RequiredEntityData<Change>) => changeAttributes,
   onTick = () => {},
+  onAcked,
 }: {
   orm: MikroORM
   consumer: Consumer
@@ -83,6 +84,7 @@ export const runIngestionLoop = async ({
   useBuffer?: boolean
   changeAttributesOverride?: (changeAttributes: RequiredEntityData<Change>) => RequiredEntityData<Change>
   onTick?: () => void
+  onAcked?: (ackedStreamSequence: number) => Promise<void>
 }) => {
   let lastStreamSequence: number | null = null
   let fetchedRecordBuffer = new FetchedRecordBuffer()
@@ -145,6 +147,18 @@ export const runIngestionLoop = async ({
     if (ackStreamSequence) {
       logger.debug(`Acking ${ackStreamSequence}...`)
       natsMessageBySequence[ackStreamSequence]?.ack()
+
+      // Under Limits retention an ack does not reclaim anything, so a stream
+      // that fills stays full and DiscardPolicy.New then rejects every publish
+      // permanently. Releasing what is already durable in Postgres is what
+      // keeps back-pressure temporary rather than terminal.
+      if (onAcked) {
+        try {
+          await onAcked(ackStreamSequence)
+        } catch (e) {
+          logger.info(`Error while releasing acked messages: ${e}`)
+        }
+      }
     }
 
     if (stitchedFetchedRecords.length) {
