@@ -20,4 +20,4 @@ catalog:
   '@mikro-orm/sql-highlighter': ^1.0.1
   '@types/node': ^24.10.1
   nats: ^2.29.3
-  typescript: ^5.5.4
+  typescript: ^7.0.2

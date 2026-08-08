@@ -12,15 +12,15 @@
   "devDependencies": {
     "@types/node": "catalog:",
     "concurrently": "^8.2.2",
-    "ts-node": "^10.9.2",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "tsx": "^4.23.11"
   },
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "up:worker": "sleep 5 && LOG_LEVEL=DEBUG pnpm ts-node src/index.ts",
+    "up:worker": "sleep 5 && LOG_LEVEL=DEBUG tsx src/index.ts",
     "up:nats": "nats-server -js",
-    "up:debezium": "sleep 1 && pnpm ts-node src/reset.ts && ./debezium.sh",
+    "up:debezium": "sleep 1 && tsx src/reset.ts && ../debezium/debezium.sh",
     "lint": "oxlint src mikro-orm.config.ts",
     "format": "prettier --write --ignore-path ../.prettierignore src mikro-orm.config.ts",
     "format:check": "prettier --check --ignore-path ../.prettierignore src mikro-orm.config.ts"
