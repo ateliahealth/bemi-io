@@ -204,6 +204,7 @@ export const buildNatsMessage = ({
     domain: '',
     stream: '',
     consumer: '',
+    deliveryCount: 0,
     redeliveryCount: 0,
     deliverySequence: 0,
     timestampNanos: 0,

@@ -1,0 +1,13 @@
+{
+  "name": "bemi-io",
+  "private": true,
+  "scripts": {
+    "lint": "oxlint core/src worker/src worker/mikro-orm.config.ts",
+    "lint:fix": "pnpm run lint --fix",
+    "test": "pnpm --filter @bemi-db/core run test",
+    "typecheck": "pnpm --recursive run typecheck"
+  },
+  "devDependencies": {
+    "oxlint": "^1.77.0"
+  }
+}

@@ -1,3 +1,5 @@
+import { beforeAll, describe, expect, test, vi } from 'vitest'
+
 import { FetchedRecord, MESSAGE_PREFIX_CONTEXT } from '../fetched-record'
 
 import { MESSAGE_DATA, buildNatsMessage } from './fixtures/nats-messages'
@@ -5,7 +7,11 @@ import { MOCKED_DATE, CHANGE_ATTRIBUTES } from './fixtures/fetched-records'
 
 describe('fromNatsMessage', () => {
   beforeAll(() => {
-    jest.spyOn(global, 'Date').mockImplementation(() => MOCKED_DATE)
+    // A plain function, not an arrow: the code under test calls `new Date(ms)`,
+    // and the fixtures expect the argument to be ignored in favour of the mock.
+    vi.spyOn(global, 'Date').mockImplementation(function () {
+      return MOCKED_DATE
+    } as unknown as DateConstructor)
   })
 
   test('parses "CREATE" natsMessages', () => {

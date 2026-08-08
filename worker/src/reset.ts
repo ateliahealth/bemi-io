@@ -26,7 +26,7 @@ const connectOrm = async () => {
   }
 }
 
-const main = (async () => {
+;(async () => {
   // Dropping the slot makes Debezium recreate it at the CURRENT LSN, so every
   // restart silently loses every change committed since the last confirmed
   // position. Keeping it means Debezium resumes exactly where it stopped; the

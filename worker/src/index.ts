@@ -29,7 +29,7 @@ const serveHealth = () => {
     .listen(HEALTH_PORT)
 }
 
-const main = (async () => {
+;(async () => {
   serveHealth()
 
   const jetstreamConnection = await connectJetstream(NATS_URL);
