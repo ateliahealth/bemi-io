@@ -187,6 +187,10 @@ debezium-server/
 
 # Misc
 package-lock.json
+# Lockfiles are committed: the Dockerfiles COPY them and install with
+# --frozen-lockfile, so ignoring them silently breaks the build on regenerate.
+!core/pnpm-lock.yaml
+!worker/pnpm-lock.yaml
 pnpm-lock.yaml
 
 # Production

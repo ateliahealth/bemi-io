@@ -74,6 +74,7 @@ export const runIngestionLoop = async ({
   insertBatchSize = 100,
   useBuffer = false,
   changeAttributesOverride = (changeAttributes: RequiredEntityData<Change>) => changeAttributes,
+  onTick = () => {},
 }: {
   orm: MikroORM
   consumer: Consumer
@@ -81,6 +82,7 @@ export const runIngestionLoop = async ({
   insertBatchSize?: number
   useBuffer?: boolean
   changeAttributesOverride?: (changeAttributes: RequiredEntityData<Change>) => RequiredEntityData<Change>
+  onTick?: () => void
 }) => {
   let lastStreamSequence: number | null = null
   let fetchedRecordBuffer = new FetchedRecordBuffer()
@@ -94,6 +96,10 @@ export const runIngestionLoop = async ({
       fetchBatchSize,
       lastStreamSequence,
     })
+
+    // A completed fetch proves the NATS round-trip still works; consumers use
+    // this to expose liveness, since a stalled loop is otherwise invisible.
+    onTick()
 
     // Last sequence tracking
     const sequences = Object.keys(natsMessageBySequence).sort((a, b) => Number(b) - Number(a)) // reverse sort

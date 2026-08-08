@@ -18,4 +18,7 @@ echo "${PROPERTIES}" > ./debezium-server/conf/application.properties &&
 if [ "${BEMI_RESET_SLOT}" = "true" ] && [ ! -f ./debezium-server/.reset-applied ]; then
   rm -f ./debezium-server/offsets.dat && touch ./debezium-server/.reset-applied
 fi &&
-cd debezium-server && ./run.sh
+# exec so the JVM becomes PID 1 and receives SIGTERM directly. Left under bash,
+# the signal is not forwarded and the container is SIGKILLed after the grace
+# period, losing up to offset.flush.interval.ms of committed offsets.
+cd debezium-server && exec ./run.sh

@@ -1,3 +1,4 @@
+import http from 'http';
 import { AckPolicy, DeliverPolicy } from 'nats';
 import { MikroORM } from '@mikro-orm/postgresql';
 
@@ -7,8 +8,30 @@ import { runIngestionLoop } from '../../core/src/ingestion'
 import mikroOrmConfig from "../mikro-orm.config"
 
 const NATS_URL = process.env.NATS_URL || 'nats://127.0.0.1:4222'
+const HEALTH_PORT = Number(process.env.PORT) || 8081
+// The fetch expires after 30s, so an idle loop still ticks on that cadence.
+const STALL_TIMEOUT_MS = Number(process.env.STALL_TIMEOUT_MS) || 90_000
+
+let lastTickAt = Date.now()
+
+const serveHealth = () => {
+  http
+    .createServer((req, res) => {
+      if (req.url?.split('?')[0] !== '/healthz') {
+        res.writeHead(404).end()
+        return
+      }
+      const msSinceLastFetch = Date.now() - lastTickAt
+      const healthy = msSinceLastFetch < STALL_TIMEOUT_MS
+      res.writeHead(healthy ? 200 : 503, { 'content-type': 'application/json' })
+      res.end(JSON.stringify({ status: healthy ? 'ok' : 'stalled', msSinceLastFetch }))
+    })
+    .listen(HEALTH_PORT)
+}
 
 const main = (async () => {
+  serveHealth()
+
   const jetstreamConnection = await connectJetstream(NATS_URL);
 
   const consumer = await buildConsumer({
@@ -25,5 +48,5 @@ const main = (async () => {
   const orm = await MikroORM.init(mikroOrmConfig)
   await orm.getMigrator().up();
 
-  await runIngestionLoop({ orm, consumer })
+  await runIngestionLoop({ orm, consumer, onTick: () => { lastTickAt = Date.now() } })
 })()

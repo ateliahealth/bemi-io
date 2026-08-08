@@ -30,14 +30,13 @@ const main = (async () => {
   // cost is WAL accumulating while the worker is down, which is recoverable.
   if (RESET_SLOT) {
     const orm = await connectOrm()
-    await orm.em.getConnection().execute(`
-      DO $$
-      BEGIN
-        IF EXISTS (SELECT 1 FROM pg_replication_slots WHERE slot_name = '${SLOT_NAME}') THEN
-          PERFORM pg_drop_replication_slot('${SLOT_NAME}');
-        END IF;
-      END $$;
-    `)
+    // Selecting from pg_replication_slots makes this a no-op when the slot is
+    // absent, so no DO block is needed and the name can be a bound parameter.
+    await orm.em
+      .getConnection()
+      .execute('SELECT pg_drop_replication_slot(slot_name) FROM pg_replication_slots WHERE slot_name = ?', [
+        SLOT_NAME,
+      ])
     await orm.close()
     // Debezium's offsets.dat lives in the debezium container, not this one;
     // debezium.sh removes it under the same flag before starting the server.
@@ -51,19 +50,27 @@ const main = (async () => {
   // the unbounded in-memory default that OOM-kills the pod. Subjects must
   // match `debezium.sink.nats-jetstream.subjects` in application.properties.
   for (let attempt = 1; ; attempt++) {
+    // Closed in `finally`: a connection left open by a failed attempt keeps the
+    // event loop alive, so this process never exits and every service gated on
+    // it completing never starts.
+    let jetstreamConnection
     try {
-      const jetstreamConnection = await connectJetstream(NATS_URL)
+      jetstreamConnection = await connectJetstream(NATS_URL)
       await ensureDebeziumStream({
         connection: jetstreamConnection,
         stream: 'DebeziumStream',
         subjects: ['bemi', '__debezium-heartbeat.*'],
       })
-      await jetstreamConnection.close()
       break
     } catch (e: any) {
       if (attempt >= MAX_ATTEMPTS) throw e
       logger.info(`NATS not ready (attempt ${attempt}/${MAX_ATTEMPTS}): ${e?.message}. Retrying in 1s...`)
       await sleep(1000)
+    } finally {
+      await jetstreamConnection?.close()
     }
   }
-})()
+})().catch((e) => {
+  logger.info(`Reset failed: ${e?.stack || e}`)
+  process.exit(1)
+})
