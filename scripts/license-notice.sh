@@ -49,7 +49,10 @@ add_to() {
     notice_body "$prefix" >"$tmp"
     cat "$file" >>"$tmp"
   fi
-  mv "$tmp" "$file"
+  # Write through the existing inode rather than `mv`, which would replace the
+  # file with mktemp's 0600 and silently drop the executable bit.
+  cat "$tmp" >"$file"
+  rm -f "$tmp"
 }
 
 UPSTREAM_REF="${UPSTREAM_REF:-upstream/main}"
