@@ -181,12 +181,9 @@ describe('stitchFetchedRecords', () => {
     })
 
     test('buffers every context of a transaction whose change has not arrived', () => {
-      // Two contexts in one transaction is what a migration between emitters
-      // looks like: the old path and the new one both emit until the last
-      // service ships. The buffering condition used to count records, so two
-      // contexts read as "already paired" and both were dropped - and the
-      // change, arriving in a later batch, was saved with no context at all.
-      // One context survived this split; two did not.
+      // Two contexts happen while both emitters are live. Counting records
+      // treated that as paired, so both were dropped and the change - arriving
+      // in a later batch - was saved bare.
       const subject = 'bemi-subject'
       const contexts = [
         new FetchedRecord({
@@ -210,8 +207,7 @@ describe('stitchFetchedRecords', () => {
 
       expect(firstBatch.stitchedFetchedRecords).toStrictEqual([])
       expect(firstBatch.newFetchedRecordBuffer).toStrictEqual(new FetchedRecordBuffer().addFetchedRecords(contexts))
-      // Acking here would purge both from the stream while they exist only in
-      // this process's memory.
+      // Acking would purge both while they exist only in memory.
       expect(firstBatch.ackStreamSequence).toBeUndefined()
 
       const change = new FetchedRecord({
@@ -225,7 +221,6 @@ describe('stitchFetchedRecords', () => {
         useBuffer: true,
       })
 
-      // The change is released carrying context, and nothing is left behind.
       expect(secondBatch.stitchedFetchedRecords).toHaveLength(1)
       expect(secondBatch.stitchedFetchedRecords[0].context()).toStrictEqual(contexts[0].context())
       expect(secondBatch.newFetchedRecordBuffer.size()).toEqual(0)

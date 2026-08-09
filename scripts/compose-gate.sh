@@ -269,12 +269,8 @@ SQL
   aborted_rows=$($PSQL_AUD "select count(*) from changes where after->>'title'='ctx-rollback' or context->>'tenantId'='ctx-aborted';" | tr -d '[:space:]')
   [ "$aborted_rows" = 0 ] || fail "$aborted_rows record(s) survived a rolled back transaction"
 
-  # Two contexts in one transaction is the migration state: the old emitter and
-  # the new one both emit until the last service ships. The worker must take one
-  # and discard the rest rather than choking or attributing twice.
-  #
-  # The batch-split half of this - contexts in one fetch, changes in the next -
-  # is unit-tested instead, because it cannot be forced deterministically here.
+  # Both emitters live at once. The batch-split half is unit-tested instead;
+  # it cannot be forced deterministically here.
   docker exec -i bemi-db-1 psql -U postgres -d appdb -q >/dev/null 2>&1 <<'SQL' || fail "could not run the double-context transaction"
 BEGIN;
 SELECT pg_logical_emit_message(true, '_bemi', '{"tenantId":"ctx-first"}');

@@ -41,29 +41,22 @@ export const stitchFetchedRecords = ({
         return
       }
 
-      // Last message without a pair - add it to the buffer
+      // Last change without a pair - add it to the buffer
       if (
         useBuffer &&
-        sameTransactionIdFetchedRecords.length === 1 && // No-pair change or context
-        fetchedRecord === sortedFetchedRecords[sortedFetchedRecords.length - 1] // Last message
+        fetchedRecord.isChange() &&
+        sameTransactionIdFetchedRecords.length === 1 &&
+        fetchedRecord === sortedFetchedRecords[sortedFetchedRecords.length - 1]
       ) {
         newFetchedRecordBuffer = newFetchedRecordBuffer.addFetchedRecord(fetchedRecord)
         return
       }
 
-      // Context message (non-mutation) - skip it, it'll be used later
+      // Skip a context unless its change has not arrived: a change without
+      // context is savable, a context without its change is not. Keyed on the
+      // change arriving, not record count - two contexts (both emitters during
+      // a migration) counted as paired, so both were dropped.
       if (fetchedRecord.isContextMessage()) {
-        // Unless its change has not arrived. A change with no context is still
-        // savable, so it can be released; a context with no change is not, and
-        // dropping it here means a later ack purges it and the change is saved
-        // with no application context. Buffer it instead.
-        //
-        // Keyed on whether the change has arrived, not on this being the only
-        // record. A transaction can legitimately carry more than one context -
-        // during a migration between emitters, both paths emit - and counting
-        // records treated that as "already paired", so both were dropped and
-        // the change was saved bare. One context survived a batch split; two
-        // did not.
         const changeArrived = sameTransactionIdFetchedRecords.some((r) => r.isChange())
         if (useBuffer && !changeArrived) {
           newFetchedRecordBuffer = newFetchedRecordBuffer.addFetchedRecord(fetchedRecord)

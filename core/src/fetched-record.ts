@@ -120,9 +120,6 @@ export class FetchedRecord {
     return this.isMessage() && this.messagePrefix === MESSAGE_PREFIX_HEARTBEAT
   }
 
-  // A real data change rather than a logical message. Stitching needs this to
-  // ask whether a transaction's change has arrived yet, which is not the same
-  // question as how many records it has.
   isChange() {
     return !this.isMessage()
   }
