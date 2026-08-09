@@ -16,19 +16,17 @@ on:
     # support YAML anchors, so an alias here parses as a literal string and
     # the filter silently matches nothing.
     paths-ignore:
-      # MIT package, linked into applications rather than part of the pipeline.
-      # Nothing here can change what Debezium decodes or what the worker
-      # stores, and its own tests run in Build.
-      - 'context/**'
+      # context/ is deliberately absent: two steps here drive that package
+      # against the live pipeline, and Build excludes integration specs, so
+      # ignoring it would let an emitter regression merge untested.
       - '**/*.md'
       - 'docs/**'
       - 'LICENSE'
   pull_request:
     paths-ignore:
-      # MIT package, linked into applications rather than part of the pipeline.
-      # Nothing here can change what Debezium decodes or what the worker
-      # stores, and its own tests run in Build.
-      - 'context/**'
+      # context/ is deliberately absent: two steps here drive that package
+      # against the live pipeline, and Build excludes integration specs, so
+      # ignoring it would let an emitter regression merge untested.
       - '**/*.md'
       - 'docs/**'
       - 'LICENSE'
