@@ -107,10 +107,8 @@ being attached.
 
 ## Releasing
 
-Publishing is driven by a tag in its own namespace, so it never collides with
-the `bemi-v*` tags that select what the deployment pipeline builds — the two
-version independently and a shared pattern would make a release of one look
-like a release of the other.
+Tagged in its own namespace, separate from the `bemi-v*` tags that select what
+the deployment pipeline builds.
 
 ```sh
 # bump "version" in context/package.json, commit, then:
@@ -118,60 +116,9 @@ git tag pg-change-context-v0.2.0
 git push origin pg-change-context-v0.2.0
 ```
 
-`.github/workflows/publish-context.yml` then runs the whole repository gate —
-typecheck, tests, lint, formatting and the licence boundary — before it
-publishes. Publishing is public and effectively irreversible, so it is the last
-place to trade checks for speed. The boundary check matters most here: every
-other consequence of breaking it is local, while this one would put
-SSPL-derived code on a public registry under an MIT licence.
-
-Two guards worth knowing about, because both failures are silent otherwise:
-
-- **The tag must match the manifest version.** A mismatch publishes a version
-  nobody asked for under a ref that does not describe it, and npm versions are
-  immutable.
-- **The tarball is inspected before publishing.** `LICENSE`, `README.md` and
-  the built output must be present and `src/` must not be. The `files` field is
-  easy to break and the damage is invisible until someone installs the result.
-
-Provenance is attested — `publishConfig` sets it, so a local publish behaves
-the same way as CI rather than the guarantee living only in the workflow.
-
-### Authentication: trusted publishing, no token
-
-CI authenticates by exchanging the workflow's short-lived OIDC identity for
-publish rights. There is no npm token in this repository and no secret to
-leak, rotate, or forget.
-
-npm grants those rights because the package's **trusted publisher** on
-npmjs.com names this repository and this workflow file. Two consequences worth
-knowing before someone trips over them:
-
-- **Renaming or moving `publish-context.yml` revokes publishing.** That is the
-  mechanism working, not a fault. Update the trusted publisher first.
-- **`NODE_AUTH_TOKEN` is deliberately never set.** npm prefers a token when one
-  is present, so configuring one would silently keep using the credential this
-  is meant to retire — and the publish would keep working, which is why nobody
-  would notice.
-
-#### First-time setup
-
-Trusted publishing is configured per package, so it needs somewhere to attach.
-Check npmjs.com first — if a trusted publisher can be configured for a package
-that does not exist yet, skip straight to step 3.
-
-1. Own the `@atelia` scope on npmjs.com.
-2. Publish `0.0.1` once from a laptop, interactively, so the package exists.
-3. On npmjs.com → the package → configure a trusted publisher: this repository,
-   workflow `publish-context.yml`.
-4. Revoke the token from step 2 if one was created. From then on every release
-   is a tag.
-
-If a token is ever used for a CI publish instead, it must have **"Bypass
-two-factor authentication" enabled** — CI cannot answer an OTP prompt and the
-publish fails with `EOTP`, which is a confusing error at the worst moment. A
-token made for a laptop publish will have that off, correctly, and will not
-work here.
+`.github/workflows/publish-context.yml` runs the full repository gate before
+publishing, and refuses if the tag disagrees with the manifest version or if
+the tarball is missing its licence or build output.
 
 ## Licence
 

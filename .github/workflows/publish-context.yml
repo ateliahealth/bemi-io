@@ -7,9 +7,8 @@ name: Publish pg-change-context
 
 on:
   push:
-    # A namespace of its own. `bemi-v*` tags select what the deployment
-    # pipeline builds; a shared pattern would make a release of one look like a
-    # release of the other, and the two version independently.
+    # Separate from `bemi-v*`, which selects what the deployment pipeline
+    # builds. The two version independently.
     tags: ['pg-change-context-v*']
 
 permissions:
@@ -21,30 +20,13 @@ jobs:
     runs-on: blacksmith-2vcpu-ubuntu-2404
     permissions:
       contents: read
-      # Not optional here. This is the credential: npm trusted publishing
-      # exchanges this short-lived OIDC token for publish rights, so without it
-      # there is nothing to authenticate with at all. It also carries the
-      # provenance attestation.
+      # This is the credential, not just provenance: npm exchanges it for
+      # publish rights.
       id-token: write
     steps:
-      # Pinned to commit SHAs rather than moving tags. This job can publish
-      # under our name, so anything that runs before `npm publish` can too -
-      # trusted publishing removes the stored token, not the ability to publish
-      # from inside this job. A major-version tag is mutable - retargeting
-      # it upstream would run replacement code here with those credentials, and
-      # nothing in this repository would have changed.
-      #
-      # Pinned here rather than repository-wide because the exposure differs in
-      # kind: the other workflows can leak a Turbo cache token, this one can
-      # publish a package under our name to a registry other people install
-      # from. Extending it is worthwhile, but it is a separate change with its
-      # own maintenance cost.
-      #
-      # .github/dependabot.yml is what keeps these current. A pinned SHA stops
-      # receiving upstream fixes, and one never updated eventually breaks on a
-      # runtime deprecation - at publish time, which is the worst moment to
-      # find out. The pin and that file are one control; dropping either leaves
-      # this worse off than leaving both out.
+      # SHA-pinned: a retargeted upstream tag would run arbitrary code in the
+      # job that can publish under our name. .github/dependabot.yml keeps them
+      # current - a pin nobody updates eventually breaks at publish time.
       - name: Check out code
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
@@ -62,9 +44,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # A tag that disagrees with the manifest publishes a version nobody asked
-      # for, under a git ref that does not describe it. Cheap to check, and
-      # impossible to unpick afterwards since npm versions are immutable.
+      # npm versions are immutable, so a mismatch cannot be unpicked.
       - name: Tag must match the package version
         run: |
           TAG_VERSION="${GITHUB_REF_NAME#pg-change-context-v}"
@@ -75,8 +55,6 @@ jobs:
           fi
           echo "Publishing @atelia/pg-change-context@$PKG_VERSION"
 
-      # The whole gate, not just this package's tests. Publishing is public and
-      # irreversible, so it is the last place to skip checks for speed.
       - name: Run typescript
         run: pnpm run typecheck
 
@@ -89,19 +67,15 @@ jobs:
       - name: Check formatting
         run: pnpm run format:check
 
-      # The most important check here. Every other consequence of a broken
-      # licence boundary is local and fixable; this one puts SSPL-derived code
-      # on a public registry under an MIT licence, in a tarball that cannot be
-      # unpublished after 72 hours and that other people will have installed.
+      # Most important check here: this is the one failure that ends up on a
+      # public registry under the wrong licence.
       - name: Check the MIT/SSPL boundary
         run: ./scripts/licence-boundary.sh
 
       - name: Build
         run: pnpm --filter @atelia/pg-change-context run build
 
-      # Guards against the artifact silently losing its licence or its build.
-      # `files` is easy to break and the failure is invisible until someone
-      # installs the result.
+      # `files` is easy to break and the damage only shows on someone's install.
       - name: Verify the tarball contents
         working-directory: context
         run: |
@@ -114,9 +88,8 @@ jobs:
           echo "$FILES" | grep -qE '^src/' && { echo "source leaked into the tarball" >&2; exit 1; }
           exit 0
 
-      # Checked rather than installed. Upgrading npm here would mean running
-      # an unpinned package in the job that can publish under our name, which
-      # is the thing the SHA pins above exist to prevent.
+      # Checked, not upgraded: `npm i -g npm@latest` would run an unpinned
+      # package in the job that can publish under our name.
       - name: npm must support trusted publishing
         run: |
           NPM_VERSION="$(npm --version)"
@@ -129,16 +102,9 @@ jobs:
 
       - name: Publish
         working-directory: context
-        # No token. npm exchanges the job's OIDC identity for short-lived
-        # publish rights, granted because the trusted publisher configured for
-        # this package on npmjs.com names this repository and this workflow
-        # file. Renaming or moving this file revokes that, which is the
-        # mechanism working rather than a bug.
-        #
-        # NODE_AUTH_TOKEN is deliberately unset: npm prefers a token when one
-        # is present, so leaving it configured would silently keep using the
-        # credential this is meant to retire.
-        #
-        # access and provenance come from publishConfig in the manifest, so a
-        # local publish behaves the same rather than the guarantee living here.
+        # No token by design: npm prefers one when present, so a configured
+        # secret would silently keep using the credential this replaces.
+        # Rights come from the trusted publisher naming this repo and this
+        # filename - renaming the file revokes them. access and provenance are
+        # in publishConfig so a local publish behaves the same.
         run: npm publish
