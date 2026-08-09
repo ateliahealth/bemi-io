@@ -54,6 +54,33 @@ Own that decision where transactions are already managed — a CLS-scoped
 transaction host, a unit-of-work, or an explicit `$transaction` at the call
 site — and call `emitChangeContext` with the client that manager hands you.
 
+If you do wrap a previously-autocommitting write, keep the transaction to
+exactly the emit and the write. Nothing else belongs inside it — no reads, no
+service calls, no outbound requests. A write that used to hold a pooled
+connection for a single statement now holds one for a transaction, on what is
+usually the hottest path in the system, and anything added inside later
+extends that hold. Worth asserting the statement count where the wrapping is
+implemented, so a third statement fails a test rather than quietly changing
+connection behaviour under load.
+
+## Why the context is an argument
+
+The context is passed in, rather than read from an ambient store the library
+owns. That is deliberate.
+
+An emitter that reads from async-local storage inherits whatever is in the
+store, and a store populated with `enterWith` can persist into later work on
+the same execution context. The failure that produces is not a missing
+context — it is one request's tenant and user attached to another request's
+changes. On any system where attribution matters, a change credited to the
+wrong tenant is worse than a change credited to nobody: the first is wrong and
+looks right, the second is merely incomplete and obvious.
+
+Taking the value as an argument makes that class of bug unreachable here. If
+the calling application keeps context in a request scope, it resolves it there
+and passes the result — the scoping stays where the request lifecycle is
+understood, and this package cannot outlive it.
+
 ## Behaviour
 
 | Input                       | Result                              |
