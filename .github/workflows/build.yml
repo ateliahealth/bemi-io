@@ -53,6 +53,9 @@ jobs:
         run: pnpm run format:check
 
       # SSPL-1.0 5(a): files this fork diverges from upstream on must say so.
+      - name: Check the MIT/SSPL boundary
+        run: ./scripts/licence-boundary.sh
+
       - name: Check licence notices
         run: |
           git remote add upstream https://github.com/BemiHQ/bemi-io.git
@@ -97,6 +100,9 @@ jobs:
 
       - name: Capture filtering excludes only what it should
         run: ./scripts/compose-gate.sh capture-filter
+
+      - name: Context survives commit and is discarded on rollback
+        run: ./scripts/compose-gate.sh context-emit
 
       - name: Service logs on failure
         if: failure()
