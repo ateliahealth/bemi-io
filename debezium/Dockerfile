@@ -2,7 +2,7 @@
 # modified by Atelia Health, 2026. Licensed under SSPL-1.0; see LICENSE.
 FROM debian:bookworm-slim AS fetch
 
-ARG DEBEZIUM_VERSION=2.5.0.Final
+ARG DEBEZIUM_VERSION=3.6.1.Final
 
 RUN apt-get update && \
   apt-get install -y --no-install-recommends curl ca-certificates && \
@@ -13,7 +13,9 @@ RUN apt-get update && \
 
 ################################################################################
 
-FROM eclipse-temurin:17-jre-jammy
+# Debezium 3.x is compiled for Java 21: its classes are class-file version 65,
+# which a 17 JRE refuses to load.
+FROM eclipse-temurin:21-jre-jammy
 
 WORKDIR /debezium
 
