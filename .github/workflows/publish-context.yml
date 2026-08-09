@@ -17,7 +17,11 @@ permissions:
 jobs:
   publish:
     name: Publish to npm
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    # GitHub-hosted, not Blacksmith: npm refuses a provenance bundle built on a
+    # self-hosted runner. Auth and signing both succeed there, so it fails at
+    # the registry with E422 after the transparency log entry is already
+    # written. This job is seconds long; the speed is not worth it.
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       # This is the credential, not just provenance: npm exchanges it for
