@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "lib": ["esnext"],
+    "target": "es2022",
+    // nodenext, not node16: MikroORM 7 is ESM and is consumed here from CJS
+    // through require(esm), which TypeScript only permits under node20,
+    // nodenext or bundler. node16 rejects it with TS1479. Both packages stay
+    // CommonJS - this changes resolution, not the emitted module format.
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "esModuleInterop": true,
+    "strict": true,
+    "skipLibCheck": true,
+    // Explicit because auto-discovery of @types stops finding node under
+    // nodenext resolution in this workspace; tsc suggests exactly this.
+    "types": ["node"],
+    "sourceMap": true,
+    "declaration": true,
+    // MikroORM entities carry decorators and the ORM reads the emitted
+    // design:type metadata to infer column types, so both of these are
+    // load-bearing rather than stylistic. Dropping either makes the ORM fall
+    // back to guessing, which fails at runtime rather than at compile time.
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
+  }
+}

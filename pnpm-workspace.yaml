@@ -12,3 +12,15 @@ packages:
 # that move. Setting it only in the Dockerfile would work, but it reintroduces
 # the gap where a dependency resolves locally and not in the container.
 nodeLinker: hoisted
+
+catalog:
+  '@mikro-orm/core': ^7.1.11
+  '@mikro-orm/decorators': ^7.1.11
+  '@mikro-orm/migrations': ^7.1.11
+  '@mikro-orm/postgresql': ^7.1.11
+  '@mikro-orm/sql-highlighter': ^1.0.1
+  '@types/node': ^24.10.1
+  '@nats-io/jetstream': ^3.4.0
+  '@nats-io/nats-core': ^3.4.0
+  '@nats-io/transport-node': ^3.4.0
+  typescript: ^7.0.2

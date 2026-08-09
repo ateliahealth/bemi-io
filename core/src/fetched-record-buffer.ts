@@ -1,3 +1,5 @@
+// Part of a fork of Bemi (https://github.com/BemiHQ/bemi-io),
+// modified by Atelia Health, 2026. Licensed under SSPL-1.0; see LICENSE.
 import { FetchedRecord } from './fetched-record'
 
 export class FetchedRecordBuffer {
@@ -46,7 +48,11 @@ export class FetchedRecordBuffer {
       // Sort by transactionId, then by streamSequence
       const sortedFetchedRecords = fetchedRecords.sort((a, b) => {
         if (a.changeAttributes.transactionId !== b.changeAttributes.transactionId) {
-          return a.changeAttributes.transactionId - b.changeAttributes.transactionId
+          // Number() is not redundant: MikroORM 7 widens every field of
+          // RequiredEntityData to also accept a raw SQL fragment, so the
+          // declared type here is number | RawQueryFragment and will not
+          // subtract. These are always numbers, parsed from the NATS message.
+          return Number(a.changeAttributes.transactionId) - Number(b.changeAttributes.transactionId)
         }
         return a.streamSequence - b.streamSequence
       })

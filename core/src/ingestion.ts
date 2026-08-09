@@ -1,7 +1,7 @@
 // Part of a fork of Bemi (https://github.com/BemiHQ/bemi-io),
 // modified by Atelia Health, 2026. Licensed under SSPL-1.0; see LICENSE.
 import { MikroORM, RequiredEntityData } from '@mikro-orm/postgresql'
-import { Consumer, JsMsg } from 'nats'
+import type { Consumer, JsMsg } from '@nats-io/jetstream'
 
 import { logger } from './logger'
 import { Change } from './entities/Change'

@@ -196,3 +196,9 @@ pnpm-lock.yaml
 /docs/build
 # Generated files
 /docs/.cache-loader
+
+# Turborepo
+.turbo
+
+# Compose gate step state
+.gate

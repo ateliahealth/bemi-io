@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-# Part of a fork of Bemi (https://github.com/BemiHQ/bemi-io),
-# modified by Atelia Health, 2026. Licensed under SSPL-1.0; see LICENSE.
-set -euo pipefail
-exec "$(git rev-parse --show-toplevel)/scripts/license-notice.sh" add

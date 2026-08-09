@@ -2,23 +2,28 @@
   "name": "@bemi-db/worker",
   "private": true,
   "dependencies": {
-    "@mikro-orm/core": "^6.1.12",
-    "@mikro-orm/migrations": "^6.1.12",
-    "@mikro-orm/postgresql": "^6.1.12",
-    "@mikro-orm/sql-highlighter": "^1.0.1",
-    "nats": "^2.29.3"
+    "@bemi-db/core": "workspace:*",
+    "@mikro-orm/core": "catalog:",
+    "@mikro-orm/migrations": "catalog:",
+    "@mikro-orm/postgresql": "catalog:",
+    "@mikro-orm/sql-highlighter": "catalog:",
+    "@nats-io/jetstream": "catalog:",
+    "@nats-io/transport-node": "catalog:"
   },
   "devDependencies": {
-    "@types/node": "^24.10.1",
+    "@types/node": "catalog:",
     "concurrently": "^8.2.2",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.5.4"
+    "typescript": "catalog:",
+    "tsx": "^4.23.11"
   },
   "scripts": {
-    "build": "pnpm tsc",
-    "typecheck": "pnpm tsc --noEmit",
-    "up:worker": "sleep 5 && LOG_LEVEL=DEBUG pnpm ts-node src/index.ts",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "up:worker": "sleep 5 && LOG_LEVEL=DEBUG tsx src/index.ts",
     "up:nats": "nats-server -js",
-    "up:debezium": "sleep 1 && pnpm ts-node src/reset.ts && ./debezium.sh"
+    "up:debezium": "sleep 1 && tsx src/reset.ts && ../debezium/debezium.sh",
+    "lint": "oxlint src mikro-orm.config.ts",
+    "format": "prettier --write --ignore-path ../.prettierignore src mikro-orm.config.ts",
+    "format:check": "prettier --check --ignore-path ../.prettierignore src mikro-orm.config.ts"
   }
 }

@@ -2,13 +2,25 @@
   "name": "@bemi-db/core",
   "version": "0.1.0",
   "description": "Automatic data change tracking for PostgreSQL",
-  "main": "index.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
+    "build": "tsc",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit -p tsconfig.spec.json",
-    "format": "prettier --write 'src/**/*.ts'",
-    "format:check": "prettier --check 'src/**/*.ts'"
+    "format": "prettier --write --ignore-path ../.prettierignore src",
+    "format:check": "prettier --check --ignore-path ../.prettierignore src",
+    "lint": "oxlint src"
   },
   "repository": {
     "type": "git",
@@ -21,15 +33,18 @@
   },
   "homepage": "https://github.com/BemiHQ/bemi#readme",
   "devDependencies": {
-    "@types/node": "^24.10.1",
-    "prettier": "^3.3.0",
-    "typescript": "^5.4.5",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
     "vitest": "^4.1.10"
   },
   "dependencies": {
-    "@mikro-orm/core": "^6.1.12",
-    "@mikro-orm/migrations": "^6.1.12",
-    "@mikro-orm/postgresql": "^6.1.12",
-    "nats": "^2.29.3"
+    "@mikro-orm/core": "catalog:",
+    "@mikro-orm/decorators": "catalog:",
+    "@mikro-orm/migrations": "catalog:",
+    "@mikro-orm/postgresql": "catalog:",
+    "@nats-io/jetstream": "catalog:",
+    "@nats-io/nats-core": "catalog:",
+    "@nats-io/transport-node": "catalog:",
+    "reflect-metadata": "^0.2.2"
   }
 }

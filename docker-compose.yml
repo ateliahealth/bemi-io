@@ -61,7 +61,7 @@ services:
 
   stream-setup:
     <<: *worker-image
-    command: ["node", "dist/worker/src/reset.js"]
+    command: ["node", "dist/src/reset.js"]
     environment:
       <<: [*source-env, *destination-env]
       NATS_URL: nats://nats:4222
@@ -87,7 +87,7 @@ services:
   worker:
     <<: *worker-image
     restart: unless-stopped
-    command: ["node", "dist/worker/src/index.js"]
+    command: ["node", "dist/src/index.js"]
     environment:
       <<: *destination-env
       NATS_URL: nats://nats:4222

@@ -1,6 +1,6 @@
 // Part of a fork of Bemi (https://github.com/BemiHQ/bemi-io),
 // modified by Atelia Health, 2026. Licensed under SSPL-1.0; see LICENSE.
-import { JsMsg } from 'nats'
+import type { JsMsg } from '@nats-io/jetstream'
 
 import { encodeData } from '../../nats'
 
@@ -200,6 +200,11 @@ export const buildNatsMessage = ({
   seq: 0,
   sid: 0,
   subject,
+  // Required by JsMsg in the v3 client; the stitching under test reads only
+  // info.streamSequence, so fixed values keep the fixture deterministic.
+  time: new Date(0),
+  timestamp: new Date(0).toISOString(),
+  timestampNanos: 0n,
   info: {
     streamSequence,
     pending: 0,
@@ -207,7 +212,6 @@ export const buildNatsMessage = ({
     stream: '',
     consumer: '',
     deliveryCount: 0,
-    redeliveryCount: 0,
     deliverySequence: 0,
     timestampNanos: 0,
     redelivered: false,

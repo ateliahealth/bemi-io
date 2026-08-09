@@ -6,11 +6,11 @@ ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 # pnpm >=10 refuses to reconcile node_modules without a TTY unless CI is set.
 ENV CI=true
-RUN npm install -g pnpm@10.32.1
+RUN corepack enable
 
 WORKDIR /repo
 
-COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json tsconfig.base.json turbo.json ./
 COPY core/package.json core/package.json
 COPY worker/package.json worker/package.json
 
@@ -26,18 +26,10 @@ FROM base AS build
 
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 
-# worker/tsconfig.json includes ../core/src, so core must stay a sibling of
-# worker. That inclusion is what pushes tsc's inferred rootDir up a level and
-# produces the doubled dist/worker/src + dist/core/src layout, which is
-# referenced in three places outside the compiler: the Helm chart's container
-# commands, the docker-compose service commands, and the entities/migrations
-# paths in worker/mikro-orm.config.ts. Any tsconfig change that alters that
-# inference silently relocates the output - the build still succeeds and the
-# container then fails to start. Grep all three before changing tsconfig.
 COPY core core
 COPY worker worker
 
-RUN pnpm --filter @bemi-db/worker run build
+RUN pnpm turbo run build --filter=@bemi-db/worker
 
 ################################################################################
 
@@ -47,7 +39,10 @@ WORKDIR /worker
 
 COPY --from=deps /repo/node_modules ./node_modules
 COPY --from=build /repo/worker/dist ./dist
+# core's published surface is dist plus its manifest, per its files field.
+COPY --from=build /repo/core/dist ./node_modules/@bemi-db/core/dist
+COPY --from=build /repo/core/package.json ./node_modules/@bemi-db/core/package.json
 
 USER node
 
-CMD ["node", "dist/worker/src/index.js"]
+CMD ["node", "dist/src/index.js"]

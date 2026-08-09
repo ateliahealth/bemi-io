@@ -1,10 +1,21 @@
 // Part of a fork of Bemi (https://github.com/BemiHQ/bemi-io),
 // modified by Atelia Health, 2026. Licensed under SSPL-1.0; see LICENSE.
-import { connect, ConsumerConfig, DiscardPolicy, JSONCodec, NatsConnection, RetentionPolicy, StorageType } from 'nats'
+import { connect } from '@nats-io/transport-node'
+// v3 splits the connection type out into its own package, and it surfaces in
+// this package's public signatures, so it is a direct dependency rather than
+// a transitive one: the emitted declarations name it, and a consumer on an
+// isolated node_modules layout cannot resolve what we do not declare.
+import type { NatsConnection } from '@nats-io/nats-core'
+import {
+  ConsumerConfig,
+  DiscardPolicy,
+  RetentionPolicy,
+  StorageType,
+  jetstream,
+  jetstreamManager,
+} from '@nats-io/jetstream'
 
 import { logger } from './logger'
-
-const JSON_CODEC = JSONCodec()
 
 // Hard cap on the on-disk stream size. Past it, DiscardPolicy.New rejects the
 // publish rather than dropping anything already accepted.
@@ -58,7 +69,7 @@ export const ensureDebeziumStream = async ({
   maxBytes?: number
   maxAgeNs?: number
 }) => {
-  const jetstreamManager = await connection.jetstreamManager()
+  const manager = await jetstreamManager(connection)
 
   const config = {
     name: stream,
@@ -73,14 +84,14 @@ export const ensureDebeziumStream = async ({
 
   let existing
   try {
-    existing = await jetstreamManager.streams.info(stream)
+    existing = await manager.streams.info(stream)
   } catch (e) {
     if (e instanceof Error && e.message !== 'stream not found') throw e
   }
 
   if (!existing) {
     logger.info(`Creating stream "${stream}" (File storage, max_bytes=${maxBytes}, max_age=${maxAgeNs}ns)...`)
-    await jetstreamManager.streams.add(config)
+    await manager.streams.add(config)
     return
   }
 
@@ -99,8 +110,8 @@ export const ensureDebeziumStream = async ({
       )
     }
     logger.info(`Recreating empty stream "${stream}" as ${config.storage}/${config.retention}...`)
-    await jetstreamManager.streams.delete(stream)
-    await jetstreamManager.streams.add(config)
+    await manager.streams.delete(stream)
+    await manager.streams.add(config)
     return
   }
 
@@ -110,7 +121,7 @@ export const ensureDebeziumStream = async ({
   const { name: _name, storage: _storage, retention: _retention, ...updatable } = config
 
   logger.info(`Reusing stream "${stream}" (${existing.state.messages} pending); applying retention config...`)
-  await jetstreamManager.streams.update(stream, updatable)
+  await manager.streams.update(stream, updatable)
 }
 
 export const buildConsumer = async ({
@@ -122,12 +133,12 @@ export const buildConsumer = async ({
   stream: string
   options: Partial<ConsumerConfig>
 }) => {
-  const jetstream = connection.jetstream()
-  const jetstreamManager = await connection.jetstreamManager()
+  const client = jetstream(connection)
+  const manager = await jetstreamManager(connection)
   let consumer
 
   try {
-    consumer = await jetstream.consumers.get(stream, options.durable_name)
+    consumer = await client.consumers.get(stream, options.durable_name)
     const { config } = await consumer.info()
     const hasDifferentValue = Object.keys(options).some((key) => {
       const keyAsOptionsKeyType = key as keyof typeof options
@@ -135,22 +146,24 @@ export const buildConsumer = async ({
     })
     if (hasDifferentValue && options.durable_name) {
       logger.info('Updating consumer...')
-      await jetstreamManager.consumers.update(stream, options.durable_name, options)
+      await manager.consumers.update(stream, options.durable_name, options)
     }
   } catch (e) {
     if (e instanceof Error && e.message !== 'consumer not found') throw e
     logger.info('Creating consumer...')
-    await jetstreamManager.consumers.add(stream, options)
-    consumer = await jetstream.consumers.get(stream, options.durable_name)
+    await manager.consumers.add(stream, options)
+    consumer = await client.consumers.get(stream, options.durable_name)
   }
 
   return consumer
 }
 
-export const decodeData = (data: Uint8Array) => {
-  return JSON_CODEC.decode(data)
+// v3 dropped JSONCodec. It was only ever JSON over UTF-8, which is what the
+// Debezium sink publishes, so these keep the same wire format explicitly.
+export const decodeData = (data: Uint8Array): unknown => {
+  return JSON.parse(new TextDecoder().decode(data))
 }
 
-export const encodeData = (data: Uint8Array) => {
-  return JSON_CODEC.encode(data)
+export const encodeData = (data: unknown): Uint8Array => {
+  return new TextEncoder().encode(JSON.stringify(data))
 }

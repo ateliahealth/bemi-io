@@ -1,13 +1,12 @@
 // Part of a fork of Bemi (https://github.com/BemiHQ/bemi-io),
 // modified by Atelia Health, 2026. Licensed under SSPL-1.0; see LICENSE.
-import http from 'http';
-import { AckPolicy, DeliverPolicy } from 'nats';
-import { MikroORM } from '@mikro-orm/postgresql';
+import http from 'http'
+import { AckPolicy, DeliverPolicy, jetstreamManager } from '@nats-io/jetstream'
+import { MikroORM } from '@mikro-orm/postgresql'
 
-import { connectJetstream, buildConsumer } from '../../core/src/nats'
-import { runIngestionLoop } from '../../core/src/ingestion'
+import { connectJetstream, buildConsumer, runIngestionLoop } from '@bemi-db/core'
 
-import mikroOrmConfig from "../mikro-orm.config"
+import mikroOrmConfig from '../mikro-orm.config'
 
 const NATS_URL = process.env.NATS_URL || 'nats://127.0.0.1:4222'
 const HEALTH_PORT = Number(process.env.PORT) || 8081
@@ -34,7 +33,7 @@ const serveHealth = () => {
 ;(async () => {
   serveHealth()
 
-  const jetstreamConnection = await connectJetstream(NATS_URL);
+  const jetstreamConnection = await connectJetstream(NATS_URL)
 
   const consumer = await buildConsumer({
     connection: jetstreamConnection,
@@ -45,21 +44,23 @@ const serveHealth = () => {
       ack_policy: AckPolicy.All,
       deliver_policy: DeliverPolicy.All,
     },
-  });
+  })
 
-  const jetstreamManager = await jetstreamConnection.jetstreamManager()
+  const manager = await jetstreamManager(jetstreamConnection)
 
   const orm = await MikroORM.init(mikroOrmConfig)
-  await orm.getMigrator().up();
+  await orm.migrator.up()
 
   await runIngestionLoop({
     orm,
     consumer,
-    onTick: () => { lastTickAt = Date.now() },
+    onTick: () => {
+      lastTickAt = Date.now()
+    },
     // `seq` purges up to but not including it, so acked messages are released
     // and the stream only holds what is not yet durable in the audit database.
     onAcked: async (ackedStreamSequence) => {
-      await jetstreamManager.streams.purge('DebeziumStream', { seq: ackedStreamSequence + 1 })
+      await manager.streams.purge('DebeziumStream', { seq: ackedStreamSequence + 1 })
     },
   })
 })()

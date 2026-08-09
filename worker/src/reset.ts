@@ -1,10 +1,9 @@
 // Part of a fork of Bemi (https://github.com/BemiHQ/bemi-io),
 // modified by Atelia Health, 2026. Licensed under SSPL-1.0; see LICENSE.
-import { MikroORM } from '@mikro-orm/postgresql';
+import { MikroORM } from '@mikro-orm/postgresql'
 
-import { logger } from '../../core/src/logger'
-import { connectJetstream, ensureDebeziumStream } from '../../core/src/nats'
-import mikroOrmConfig from "../mikro-orm.config"
+import { logger, connectJetstream, ensureDebeziumStream } from '@bemi-db/core'
+import mikroOrmConfig from '../mikro-orm.config'
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -39,9 +38,7 @@ const connectOrm = async () => {
     // absent, so no DO block is needed and the name can be a bound parameter.
     await orm.em
       .getConnection()
-      .execute('SELECT pg_drop_replication_slot(slot_name) FROM pg_replication_slots WHERE slot_name = ?', [
-        SLOT_NAME,
-      ])
+      .execute('SELECT pg_drop_replication_slot(slot_name) FROM pg_replication_slots WHERE slot_name = ?', [SLOT_NAME])
     await orm.close()
     // Debezium's offsets.dat lives in the debezium container, not this one;
     // debezium.sh removes it under the same flag before starting the server.
