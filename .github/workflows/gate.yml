@@ -1,0 +1,80 @@
+# Part of a fork of Bemi (https://github.com/BemiHQ/bemi-io),
+# modified by Atelia Health, 2026. Licensed under SSPL-1.0; see LICENSE.
+#
+# The compose regression gate, separate from Build so it can carry path
+# filters of its own. It stands up Postgres, Debezium, NATS and the worker and
+# runs for several minutes; Build is seconds and runs on everything.
+#
+# GitHub applies path filters per workflow rather than per job, so the only way
+# to skip the slow half without also skipping the fast half is to split them.
+name: Gate
+
+on:
+  push:
+    branches: [main]
+    # Repeated rather than shared with an anchor: GitHub Actions does not
+    # support YAML anchors, so an alias here parses as a literal string and
+    # the filter silently matches nothing.
+    paths-ignore:
+      # MIT package, linked into applications rather than part of the pipeline.
+      # Nothing here can change what Debezium decodes or what the worker
+      # stores, and its own tests run in Build.
+      - 'context/**'
+      - '**/*.md'
+      - 'docs/**'
+      - 'LICENSE'
+  pull_request:
+    paths-ignore:
+      # MIT package, linked into applications rather than part of the pipeline.
+      # Nothing here can change what Debezium decodes or what the worker
+      # stores, and its own tests run in Build.
+      - 'context/**'
+      - '**/*.md'
+      - 'docs/**'
+      - 'LICENSE'
+
+permissions:
+  contents: read
+
+jobs:
+  compose-gate:
+    name: Compose regression gate
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 30
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Stand up the pipeline
+        run: ./scripts/compose-gate.sh setup
+
+      - name: Changes propagate with before/after images
+        run: ./scripts/compose-gate.sh baseline
+
+      - name: Writes during worker downtime still land
+        run: ./scripts/compose-gate.sh downtime
+
+      - name: Control - a slot reset really does lose them
+        run: ./scripts/compose-gate.sh negative-control
+
+      - name: Back-pressure holds the replication slot
+        run: ./scripts/compose-gate.sh backpressure
+
+      - name: Raising the cap replays every row exactly once
+        run: ./scripts/compose-gate.sh recovery
+
+      - name: Each service recovers from a kill
+        run: ./scripts/compose-gate.sh kill-restart
+
+      - name: An abandoned replication slot is reported
+        run: ./scripts/compose-gate.sh slot-alarm
+
+      - name: Capture filtering excludes only what it should
+        run: ./scripts/compose-gate.sh capture-filter
+
+      - name: Context survives commit and is discarded on rollback
+        run: ./scripts/compose-gate.sh context-emit
+
+      - name: Service logs on failure
+        if: failure()
+        run: docker compose logs --tail 200
