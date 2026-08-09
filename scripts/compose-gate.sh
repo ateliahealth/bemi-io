@@ -243,6 +243,12 @@ step_context_emit() {
   # Rollback runs first and commit second, so the commit doubles as the control.
   # Asserting "the aborted row is absent" on its own would pass just as happily
   # against a dead pipeline.
+  # Before the write, not after: the worker can persist it within the second,
+  # and a target read afterwards already includes it - so the wait would sit
+  # out its full timeout for a row that already landed.
+  local target
+  target=$(( $(count) + 1 ))
+
   docker exec -i bemi-db-1 psql -U postgres -d appdb -q >/dev/null 2>&1 <<'SQL' || fail "could not run the context transactions"
 BEGIN;
 SELECT pg_logical_emit_message(true, '_bemi', '{"tenantId":"ctx-aborted"}');
@@ -254,8 +260,6 @@ INSERT INTO todos (title) VALUES ('ctx-commit');
 COMMIT;
 SQL
 
-  local target
-  target=$(( $(count) + 1 ))
   wait_count "$target" 40 || fail "the committed write never landed; the pipeline is not capturing"
 
   # Give the aborted transaction the same opportunity to appear as the
@@ -269,7 +273,25 @@ SQL
   aborted_rows=$($PSQL_AUD "select count(*) from changes where after->>'title'='ctx-rollback' or context->>'tenantId'='ctx-aborted';" | tr -d '[:space:]')
   [ "$aborted_rows" = 0 ] || fail "$aborted_rows record(s) survived a rolled back transaction"
 
-  pass "context stitched onto the committed change, and the aborted transaction left nothing behind"
+  # Both emitters live at once. The batch-split half is unit-tested instead;
+  # it cannot be forced deterministically here.
+  target=$(( $(count) + 1 ))
+
+  docker exec -i bemi-db-1 psql -U postgres -d appdb -q >/dev/null 2>&1 <<'SQL' || fail "could not run the double-context transaction"
+BEGIN;
+SELECT pg_logical_emit_message(true, '_bemi', '{"tenantId":"ctx-first"}');
+SELECT pg_logical_emit_message(true, '_bemi', '{"tenantId":"ctx-second"}');
+INSERT INTO todos (title) VALUES ('ctx-double');
+COMMIT;
+SQL
+
+  wait_count "$target" 40 || fail "the double-context write never landed"
+
+  local double_context
+  double_context=$($PSQL_AUD "select context->>'tenantId' from changes where after->>'title'='ctx-double';" | tr -d '[:space:]')
+  [ "$double_context" = "ctx-first" ] || fail "double-context change carried '$double_context', expected 'ctx-first'"
+
+  pass "context stitched onto the committed change, aborted transaction left nothing behind, duplicate contexts resolved to the first"
 }
 
 case "${1:-all}" in

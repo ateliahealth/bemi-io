@@ -120,6 +120,10 @@ export class FetchedRecord {
     return this.isMessage() && this.messagePrefix === MESSAGE_PREFIX_HEARTBEAT
   }
 
+  isChange() {
+    return !this.isMessage()
+  }
+
   context() {
     return this.changeAttributes.context as object
   }

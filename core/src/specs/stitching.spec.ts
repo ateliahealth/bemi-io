@@ -180,6 +180,52 @@ describe('stitchFetchedRecords', () => {
       })
     })
 
+    test('buffers every context of a transaction whose change has not arrived', () => {
+      // Two contexts happen while both emitters are live. Counting records
+      // treated that as paired, so both were dropped and the change - arriving
+      // in a later batch - was saved bare.
+      const subject = 'bemi-subject'
+      const contexts = [
+        new FetchedRecord({
+          subject,
+          streamSequence: 1,
+          changeAttributes: { ...CHANGE_ATTRIBUTES.CREATE_MESSAGE, transactionId: 1 },
+          messagePrefix: MESSAGE_PREFIX_CONTEXT,
+        }),
+        new FetchedRecord({
+          subject,
+          streamSequence: 2,
+          changeAttributes: { ...CHANGE_ATTRIBUTES.CREATE_MESSAGE, transactionId: 1 },
+          messagePrefix: MESSAGE_PREFIX_CONTEXT,
+        }),
+      ]
+
+      const firstBatch = stitchFetchedRecords({
+        fetchedRecordBuffer: new FetchedRecordBuffer().addFetchedRecords(contexts),
+        useBuffer: true,
+      })
+
+      expect(firstBatch.stitchedFetchedRecords).toStrictEqual([])
+      expect(firstBatch.newFetchedRecordBuffer).toStrictEqual(new FetchedRecordBuffer().addFetchedRecords(contexts))
+      // Acking would purge both while they exist only in memory.
+      expect(firstBatch.ackStreamSequence).toBeUndefined()
+
+      const change = new FetchedRecord({
+        subject,
+        streamSequence: 3,
+        changeAttributes: { ...CHANGE_ATTRIBUTES.CREATE, transactionId: 1 },
+      })
+
+      const secondBatch = stitchFetchedRecords({
+        fetchedRecordBuffer: firstBatch.newFetchedRecordBuffer.addFetchedRecords([change]),
+        useBuffer: true,
+      })
+
+      expect(secondBatch.stitchedFetchedRecords).toHaveLength(1)
+      expect(secondBatch.stitchedFetchedRecords[0].context()).toStrictEqual(contexts[0].context())
+      expect(secondBatch.newFetchedRecordBuffer.size()).toEqual(0)
+    })
+
     test('buffers an unpaired context even when a heartbeat follows it', () => {
       const subject = 'bemi-subject'
       const fetchedRecords = [
