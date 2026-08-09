@@ -24,6 +24,9 @@ catalogs:
     '@nats-io/jetstream':
       specifier: ^3.4.0
       version: 3.4.0
+    '@nats-io/nats-core':
+      specifier: ^3.4.0
+      version: 3.4.0
     '@nats-io/transport-node':
       specifier: ^3.4.0
       version: 3.4.0
@@ -69,6 +72,9 @@ importers:
         specifier: 'catalog:'
         version: 7.1.11(@mikro-orm/core@7.1.11(dataloader@2.2.3))
       '@nats-io/jetstream':
+        specifier: 'catalog:'
+        version: 3.4.0
+      '@nats-io/nats-core':
         specifier: 'catalog:'
         version: 3.4.0
       '@nats-io/transport-node':

@@ -1,6 +1,10 @@
 // Part of a fork of Bemi (https://github.com/BemiHQ/bemi-io),
 // modified by Atelia Health, 2026. Licensed under SSPL-1.0; see LICENSE.
 import { connect } from '@nats-io/transport-node'
+// v3 splits the connection type out into its own package, and it surfaces in
+// this package's public signatures, so it is a direct dependency rather than
+// a transitive one: the emitted declarations name it, and a consumer on an
+// isolated node_modules layout cannot resolve what we do not declare.
 import type { NatsConnection } from '@nats-io/nats-core'
 import {
   ConsumerConfig,

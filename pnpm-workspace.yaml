@@ -21,5 +21,6 @@ catalog:
   '@mikro-orm/sql-highlighter': ^1.0.1
   '@types/node': ^24.10.1
   '@nats-io/jetstream': ^3.4.0
+  '@nats-io/nats-core': ^3.4.0
   '@nats-io/transport-node': ^3.4.0
   typescript: ^7.0.2

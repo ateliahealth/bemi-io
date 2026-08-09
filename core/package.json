@@ -43,6 +43,7 @@
     "@mikro-orm/migrations": "catalog:",
     "@mikro-orm/postgresql": "catalog:",
     "@nats-io/jetstream": "catalog:",
+    "@nats-io/nats-core": "catalog:",
     "@nats-io/transport-node": "catalog:",
     "reflect-metadata": "^0.2.2"
   }
