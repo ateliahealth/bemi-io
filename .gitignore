@@ -202,3 +202,6 @@ pnpm-lock.yaml
 
 # Compose gate step state
 .gate
+
+# Local MCP server config; references internal databases
+.mcp.json
