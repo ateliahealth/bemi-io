@@ -12,7 +12,10 @@ PROPERTIES="${PROPERTIES//DB_USER/$DB_USER}" &&
 PROPERTIES="${PROPERTIES//DB_PASSWORD/$DB_PASSWORD}" &&
 PROPERTIES="${PROPERTIES//NATS_URL/$NATS_URL}" &&
 PROPERTIES="${PROPERTIES//BEMI_SLOT_NAME/$BEMI_SLOT_NAME}" &&
-echo "${PROPERTIES}" > ./debezium-server/conf/application.properties &&
+# config/, not conf/: the dist renamed the directory in 3.x, and run.sh puts
+# config on the classpath from there. Writing to the old path leaves the server
+# with no configuration at all rather than failing loudly.
+echo "${PROPERTIES}" > ./debezium-server/config/application.properties &&
 # reset.js drops the slot from another container; the connector offsets live
 # here, and resuming from them against a recreated slot fails. The marker
 # keeps this to once per container: stream-setup is one-shot, so on an
