@@ -73,7 +73,14 @@ export interface SlotWarning {
 
 // slot name -> the first observation at which it was seen inactive, kept so a
 // slot has to stay inactive rather than merely be caught mid-restart.
-export type SlotMonitorState = Record<string, number>
+//
+// A Map rather than an object because the key is a slot name, which Postgres
+// allows to be any lowercase identifier - including `constructor` and
+// `__proto__`. On a plain object those read back as inherited members instead
+// of a timestamp, so the arithmetic yields NaN, every comparison against it is
+// false, and that slot can never be reported. A slot structurally invisible to
+// this check is the precise failure it exists to prevent.
+export type SlotMonitorState = Map<string, number>
 
 // Deliberately does not consider whether a slot is "ours". An abandoned slot
 // left by a previous incarnation of this pipeline retains WAL exactly as hard
@@ -91,7 +98,7 @@ export const observeSlots = ({
   retentionWarnBytes: number
   inactiveGraceMs: number
 }): { warnings: SlotWarning[]; state: SlotMonitorState } => {
-  const state: SlotMonitorState = {}
+  const state: SlotMonitorState = new Map()
   const warnings: SlotWarning[] = []
 
   slots.forEach((slot) => {
@@ -106,8 +113,8 @@ export const observeSlots = ({
       //
       // Carried forward from the previous observation, not reset, so the clock
       // starts when the slot first went quiet rather than on the latest poll.
-      const since = previousState[slot.slotName] ?? now
-      state[slot.slotName] = since
+      const since = previousState.get(slot.slotName) ?? now
+      state.set(slot.slotName, since)
 
       if (now - since >= inactiveGraceMs) {
         warnings.push({

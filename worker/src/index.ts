@@ -39,7 +39,7 @@ let lastSlots: ReplicationSlotState[] = []
 let lastSlotReadAt: number | undefined = undefined
 // Survives only as long as the process. A restart restarts the grace period,
 // which is the safe direction: it delays a warning rather than inventing one.
-let slotMonitorState: SlotMonitorState = {}
+let slotMonitorState: SlotMonitorState = new Map()
 
 const serveHealth = () => {
   http
@@ -94,9 +94,20 @@ const pollReplicationSlots = (orm: MikroORM) => {
     }
   }
 
-  void poll()
-  // unref so this timer alone never holds the process open.
-  setInterval(poll, SLOT_POLL_INTERVAL_MS).unref()
+  // Self-scheduling rather than setInterval: the callback is async, and
+  // setInterval would start a second poll while the first is still waiting on
+  // the database. Overlapping polls can finish out of order and write stale
+  // slot data over fresh, and each one holds a connection from the same pool
+  // ingestion uses - so a slow query would compound into the pipeline itself.
+  // Waiting for one poll before scheduling the next makes that impossible;
+  // the cost is that the interval is a gap between polls rather than a period,
+  // which for a sampling check does not matter.
+  const scheduleNext = () => {
+    // unref so this timer alone never holds the process open.
+    setTimeout(() => void poll().then(scheduleNext), SLOT_POLL_INTERVAL_MS).unref()
+  }
+
+  void poll().then(scheduleNext)
 }
 
 ;(async () => {

@@ -159,20 +159,29 @@ step_slot_alarm() {
   local false_positives
   false_positives=$(docker compose logs --since "$since" worker 2>/dev/null | grep -c 'BEMI_SLOT_WARNING inactive.*bemi_local' || true)
 
+  # Read the endpoint while the orphan still exists. Dropping it first and then
+  # asserting only on bemi_local would let a regression that omits the orphan
+  # from the endpoint pass, under a message claiming the two agree - the stale
+  # poll happens to still carry it, so the check would pass on timing.
+  local reported
+  reported=$(docker exec bemi-worker-1 node -e \
+    "require('http').get('http://127.0.0.1:8081/healthz',r=>{let b='';r.on('data',c=>b+=c);r.on('end',()=>{const j=JSON.parse(b);console.log(j.replicationSlots.map(s=>s.slotName+':'+s.active).join(','))})})" \
+    2>/dev/null | tr -d '[:space:]')
+
   $PSQL_APP "select pg_drop_replication_slot('bemi_orphan');" >/dev/null 2>&1 \
     || fail "could not drop the orphan slot"
 
   [ "$false_positives" = 0 ] || fail "the active slot was reported inactive $false_positives times"
 
-  # The endpoint has to carry the same fact, so an alert can be built on either
-  # the log line or a scrape without the two disagreeing.
-  local reported
-  reported=$(docker exec bemi-worker-1 node -e \
-    "require('http').get('http://127.0.0.1:8081/healthz',r=>{let b='';r.on('data',c=>b+=c);r.on('end',()=>{const j=JSON.parse(b);console.log(j.replicationSlots.map(s=>s.slotName+':'+s.active).join(','))})})" \
-    2>/dev/null | tr -d '[:space:]')
+  # Both facts, so an alert can be built on either the log line or a scrape
+  # without the two disagreeing about what exists.
   case "$reported" in
     *bemi_local:true*) ;;
-    *) fail "/healthz did not report the live slot: '$reported'" ;;
+    *) fail "/healthz did not report the live slot as active: '$reported'" ;;
+  esac
+  case "$reported" in
+    *bemi_orphan:false*) ;;
+    *) fail "/healthz did not report the abandoned slot as inactive: '$reported'" ;;
   esac
 
   pass "abandoned slot reported in $hits log lines, no false positive on the live slot, /healthz agrees ($reported)"

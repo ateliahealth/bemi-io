@@ -20,7 +20,7 @@ const slot = (overrides: Partial<ReplicationSlotState> = {}): ReplicationSlotSta
 
 const observe = ({
   slots,
-  previousState = {},
+  previousState = new Map(),
   now = T0,
 }: {
   slots: ReplicationSlotState[]
@@ -45,13 +45,13 @@ describe('observeSlots', () => {
 
     expect(warnings).toStrictEqual([])
     // The clock is started, though, so the next observation can measure it.
-    expect(state).toStrictEqual({ bemi_local: T0 })
+    expect(state).toStrictEqual(new Map([['bemi_local', T0]]))
   })
 
   test('still says nothing one poll before the grace period elapses', () => {
     const { warnings } = observe({
       slots: [slot({ active: false })],
-      previousState: { bemi_local: T0 },
+      previousState: new Map([['bemi_local', T0]]),
       now: T0 + GRACE_MS - 1,
     })
 
@@ -61,7 +61,7 @@ describe('observeSlots', () => {
   test('warns once the slot has stayed inactive past the grace period', () => {
     const { warnings } = observe({
       slots: [slot({ slotName: 'abandoned', active: false, retainedBytes: 1024 })],
-      previousState: { abandoned: T0 },
+      previousState: new Map([['abandoned', T0]]),
       now: T0 + GRACE_MS,
     })
 
@@ -83,26 +83,26 @@ describe('observeSlots', () => {
   test('forgets the timer when a slot comes back', () => {
     const { warnings, state } = observe({
       slots: [slot({ active: true })],
-      previousState: { bemi_local: T0 },
+      previousState: new Map([['bemi_local', T0]]),
       now: T0 + GRACE_MS,
     })
 
     expect(warnings).toStrictEqual([])
     // Not merely unreported - cleared, so a later restart gets a fresh grace
     // period instead of warning immediately on the strength of an old one.
-    expect(state).toStrictEqual({})
+    expect(state).toStrictEqual(new Map())
   })
 
   test('forgets slots that no longer exist', () => {
-    const { state } = observe({ slots: [], previousState: { dropped: T0 } })
+    const { state } = observe({ slots: [], previousState: new Map([['dropped', T0]]) })
 
-    expect(state).toStrictEqual({})
+    expect(state).toStrictEqual(new Map())
   })
 
   test('reports a long-inactive slot once, not also as retention', () => {
     const { warnings } = observe({
       slots: [slot({ active: false, retainedBytes: 800 * GB })],
-      previousState: { bemi_local: T0 },
+      previousState: new Map([['bemi_local', T0]]),
       now: T0 + GRACE_MS,
     })
 
@@ -131,12 +131,32 @@ describe('observeSlots', () => {
     // is the orphan that goes unnoticed.
     const { warnings } = observe({
       slots: [slot({ slotName: 'some_other_tool', active: false, retainedBytes: 851 * GB })],
-      previousState: { some_other_tool: T0 },
+      previousState: new Map([['some_other_tool', T0]]),
       now: T0 + GRACE_MS,
     })
 
     expect(warnings.map((w) => w.reason)).toStrictEqual(['inactive'])
     expect(warnings[0].message).toContain('851.0 GB')
+  })
+
+  test.each(['constructor', '__proto__'])('tracks a slot named %s like any other', (slotName) => {
+    // Both are valid Postgres slot names - lowercase letters and underscores.
+    // Held in a plain object they read back as inherited members rather than a
+    // timestamp, the arithmetic yields NaN, every comparison is false, and the
+    // slot can never be reported. A slot invisible to this check is the exact
+    // failure it exists to prevent, so the state is a Map.
+    const first = observe({ slots: [slot({ slotName, active: false, retainedBytes: 40 * GB })] })
+    expect(first.warnings).toStrictEqual([])
+    expect(first.state.get(slotName)).toEqual(T0)
+
+    const second = observe({
+      slots: [slot({ slotName, active: false, retainedBytes: 40 * GB })],
+      previousState: first.state,
+      now: T0 + GRACE_MS,
+    })
+
+    expect(second.warnings.map((w) => w.reason)).toStrictEqual(['inactive'])
+    expect(second.warnings[0].slotName).toEqual(slotName)
   })
 
   test('says nothing when the server reports no slots', () => {
