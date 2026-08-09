@@ -23,7 +23,7 @@ COPY --from=fetch /debezium-server ./debezium-server
 COPY debezium/application.properties ./
 COPY debezium/debezium.sh ./
 
-# debezium.sh rewrites conf/application.properties and the server persists
+# debezium.sh rewrites config/application.properties and the server persists
 # offsets.dat, both under /debezium, so the runtime user must own it.
 RUN useradd --create-home --uid 1000 debezium && chown -R debezium:debezium /debezium
 
