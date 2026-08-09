@@ -1,5 +1,5 @@
 {
-  "name": "@ateliahealth/pg-change-context",
+  "name": "@atelia/pg-change-context",
   "version": "0.1.0",
   "description": "Emit application context alongside PostgreSQL data changes for logical-decoding CDC",
   "main": "dist/index.js",

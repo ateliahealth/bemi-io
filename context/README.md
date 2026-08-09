@@ -1,4 +1,4 @@
-# @ateliahealth/pg-change-context
+# @atelia/pg-change-context
 
 Emits application context alongside PostgreSQL data changes, for consumers that
 read it out of the write-ahead log via logical decoding.
@@ -12,7 +12,7 @@ One thing: issues `pg_logical_emit_message(true, '_bemi', <json>)` on a client
 you give it.
 
 ```ts
-import { emitChangeContext } from '@ateliahealth/pg-change-context'
+import { emitChangeContext } from '@atelia/pg-change-context'
 
 await prisma.$transaction(async (tx) => {
   await emitChangeContext(tx, { tenantId, userId })
