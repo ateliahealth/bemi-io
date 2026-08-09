@@ -1,0 +1,26 @@
+# Part of a fork of Bemi (https://github.com/BemiHQ/bemi-io),
+# modified by Atelia Health, 2026. Licensed under SSPL-1.0; see LICENSE.
+#
+# Exists to keep the SHA pins in publish-context.yml alive. Pinning an action
+# to a commit is what stops a retargeted upstream tag running arbitrary code in
+# a job holding an npm token - but it also freezes that action, and a frozen
+# action stops receiving fixes and eventually breaks on a runtime deprecation.
+# It would break at publish time, which is the worst moment to find out.
+#
+# So the pin and this file are one control, not two. Removing this leaves the
+# pins rotting silently, which is worse than never having pinned them.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    # One pull request rather than three. These move together and each needs a
+    # human to look at it, so batching is the difference between a habit and
+    # noise that gets ignored.
+    groups:
+      actions:
+        patterns: ['*']
+    commit-message:
+      prefix: ci
+    labels: ['dependencies']

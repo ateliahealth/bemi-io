@@ -35,8 +35,13 @@ jobs:
       # kind: the other workflows can leak a Turbo cache token, this one can
       # publish a package under our name to a registry other people install
       # from. Extending it is worthwhile, but it is a separate change with its
-      # own maintenance cost - a pinned SHA stops receiving upstream fixes, so
-      # each one has to be updated deliberately.
+      # own maintenance cost.
+      #
+      # .github/dependabot.yml is what keeps these current. A pinned SHA stops
+      # receiving upstream fixes, and one never updated eventually breaks on a
+      # runtime deprecation - at publish time, which is the worst moment to
+      # find out. The pin and that file are one control; dropping either leaves
+      # this worse off than leaving both out.
       - name: Check out code
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
