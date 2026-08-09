@@ -85,11 +85,17 @@ understood, and this package cannot outlive it.
 
 | Input                       | Result                              |
 | --------------------------- | ----------------------------------- |
-| Empty context `{}`          | No emit, returns `false`            |
+| Empty context `{}`          | Returns without emitting            |
 | Context over the byte limit | Throws — never truncated or skipped |
 | Non-serialisable value      | Throws                              |
 | Not a plain object          | Throws                              |
 | Executor rejects            | Propagates                          |
+
+It returns `void`. Every failure throws, so there is no result to check and no
+way to ignore one — a call that returns normally either emitted or had nothing
+to emit. A boolean would have to be checked to mean anything, and an unchecked
+return that quietly meant "did nothing" is the shape of bug this package exists
+to remove.
 
 Nothing here fails quietly. A context that did not reach the log means changes
 will be attributed to nobody, and only the caller can decide whether that
@@ -101,10 +107,8 @@ being attached.
 
 ## Releasing
 
-Publishing is driven by a tag in its own namespace, so it never collides with
-the `bemi-v*` tags that select what the deployment pipeline builds — the two
-version independently and a shared pattern would make a release of one look
-like a release of the other.
+Tagged in its own namespace, separate from the `bemi-v*` tags that select what
+the deployment pipeline builds.
 
 ```sh
 # bump "version" in context/package.json, commit, then:
@@ -112,24 +116,9 @@ git tag pg-change-context-v0.2.0
 git push origin pg-change-context-v0.2.0
 ```
 
-`.github/workflows/publish-context.yml` then runs the whole repository gate —
-typecheck, tests, lint, formatting and the licence boundary — before it
-publishes. Publishing is public and effectively irreversible, so it is the last
-place to trade checks for speed. The boundary check matters most here: every
-other consequence of breaking it is local, while this one would put
-SSPL-derived code on a public registry under an MIT licence.
-
-Two guards worth knowing about, because both failures are silent otherwise:
-
-- **The tag must match the manifest version.** A mismatch publishes a version
-  nobody asked for under a ref that does not describe it, and npm versions are
-  immutable.
-- **The tarball is inspected before publishing.** `LICENSE`, `README.md` and
-  the built output must be present and `src/` must not be. The `files` field is
-  easy to break and the damage is invisible until someone installs the result.
-
-Provenance is attested — `publishConfig` sets it, so a local publish behaves
-the same way as CI rather than the guarantee living only in the workflow.
+`.github/workflows/publish-context.yml` runs the full repository gate before
+publishing, and refuses if the tag disagrees with the manifest version or if
+the tarball is missing its licence or build output.
 
 ## Licence
 
