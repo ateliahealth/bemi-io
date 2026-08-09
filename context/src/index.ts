@@ -27,7 +27,11 @@ export class ChangeContextError extends Error {
 // `true` is not negotiable: a non-transactional message carries no transaction
 // id, and consumers pair context to changes by it. Being transactional is also
 // what makes a rollback discard the context along with the writes.
-const EMIT_SQL = 'SELECT pg_logical_emit_message(true, $1, $2)'
+//
+// ::text is load-bearing. pg_logical_emit_message returns pg_lsn, which Prisma
+// cannot deserialize - the message is written and the call then throws on the
+// way back, so inside a transaction it rolls back a write it just attributed.
+const EMIT_SQL = 'SELECT pg_logical_emit_message(true, $1, $2)::text'
 
 /**
  * Emits application context for the changes in the caller's transaction.
