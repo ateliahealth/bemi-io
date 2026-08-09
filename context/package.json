@@ -33,12 +33,14 @@
   ],
   "scripts": {
     "build": "tsc",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "typecheck": "tsc --noEmit -p tsconfig.spec.json",
     "format": "prettier --write --ignore-path ../.prettierignore src",
     "format:check": "prettier --check --ignore-path ../.prettierignore src",
-    "lint": "oxlint src"
+    "lint": "oxlint src",
+    "prisma:generate": "prisma generate",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.mts",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit -p tsconfig.spec.json"
   },
   "license": "MIT",
   "publishConfig": {
@@ -46,7 +48,9 @@
     "provenance": true
   },
   "devDependencies": {
+    "@prisma/client": "6.19.3",
     "@types/node": "catalog:",
+    "prisma": "6.19.3",
     "typescript": "catalog:",
     "vitest": "^4.1.10"
   },

@@ -3,9 +3,9 @@ import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   test: {
-    include: ['src/specs/**/*.spec.ts'],
-    // Needs a live database, so it runs from the gate rather than here.
-    exclude: ['src/specs/**/*.int.spec.ts'],
+    include: ['src/specs/**/*.int.spec.ts'],
     environment: 'node',
+    // Prisma's engine start-up dwarfs the assertions.
+    testTimeout: 30_000,
   },
 })

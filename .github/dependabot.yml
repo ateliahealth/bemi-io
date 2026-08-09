@@ -1,8 +1,8 @@
 # Part of a fork of Bemi (https://github.com/BemiHQ/bemi-io),
 # modified by Atelia Health, 2026. Licensed under SSPL-1.0; see LICENSE.
 #
-# Keeps the SHA pins in publish-context.yml current. A pin nobody updates stops
-# receiving fixes and eventually breaks at publish time.
+# Keeps the workflows' SHA pins current. A pin nobody updates stops receiving
+# fixes and eventually breaks, at publish time in the worst case.
 version: 2
 updates:
   - package-ecosystem: github-actions

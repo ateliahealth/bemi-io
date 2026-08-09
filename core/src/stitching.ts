@@ -4,12 +4,19 @@ import { logger } from './logger'
 import { FetchedRecord } from './fetched-record'
 import { FetchedRecordBuffer } from './fetched-record-buffer'
 
+// A transaction's records are contiguous in the stream, so a context whose
+// change has not arrived within this many sequences is never getting one.
+// Keeping it would clamp the ack forever and stall the stream.
+const ORPHAN_CONTEXT_SEQUENCE_GAP = 1000
+
 export const stitchFetchedRecords = ({
   fetchedRecordBuffer,
   useBuffer = false,
+  orphanContextSequenceGap = ORPHAN_CONTEXT_SEQUENCE_GAP,
 }: {
   fetchedRecordBuffer: FetchedRecordBuffer
   useBuffer: boolean
+  orphanContextSequenceGap?: number
 }) => {
   let stitchedFetchedRecords: FetchedRecord[] = []
   let maxSequence: number | undefined = undefined
@@ -58,8 +65,17 @@ export const stitchFetchedRecords = ({
       // a migration) counted as paired, so both were dropped.
       if (fetchedRecord.isContextMessage()) {
         const changeArrived = sameTransactionIdFetchedRecords.some((r) => r.isChange())
-        if (useBuffer && !changeArrived) {
+        // Dropped rather than held forever if its change never comes - a
+        // transaction that wrote nothing, or wrote only to excluded tables.
+        // Holding it clamps the ack, so the stream never purges and fills.
+        const orphaned =
+          maxSequence !== undefined && maxSequence - fetchedRecord.streamSequence > orphanContextSequenceGap
+        if (useBuffer && !changeArrived && !orphaned) {
           newFetchedRecordBuffer = newFetchedRecordBuffer.addFetchedRecord(fetchedRecord)
+        } else if (orphaned) {
+          logger.info(
+            `Dropping context message #${fetchedRecord.streamSequence} whose change never arrived (stream at #${maxSequence})`,
+          )
         }
         return
       }
