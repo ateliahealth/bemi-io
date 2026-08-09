@@ -180,6 +180,59 @@ describe('stitchFetchedRecords', () => {
       })
     })
 
+    // A second, self-contained transaction so the trailing record is stitched
+    // and released rather than buffered as an unpaired change of its own.
+    const pairedTransaction = (subject: string, contextSequence: number, changeSequence: number) => [
+      new FetchedRecord({
+        subject,
+        streamSequence: contextSequence,
+        changeAttributes: { ...CHANGE_ATTRIBUTES.CREATE_MESSAGE, transactionId: 2 },
+        messagePrefix: MESSAGE_PREFIX_CONTEXT,
+      }),
+      new FetchedRecord({
+        subject,
+        streamSequence: changeSequence,
+        changeAttributes: { ...CHANGE_ATTRIBUTES.CREATE, transactionId: 2 },
+      }),
+    ]
+
+    const orphanContext = (subject: string) =>
+      new FetchedRecord({
+        subject,
+        streamSequence: 1,
+        changeAttributes: { ...CHANGE_ATTRIBUTES.CREATE_MESSAGE, transactionId: 1 },
+        messagePrefix: MESSAGE_PREFIX_CONTEXT,
+      })
+
+    test('drops a context whose change never arrives, so the ack can advance', () => {
+      // A transaction that wrote nothing, or only to excluded tables. Holding
+      // it clamps the ack forever and the stream never purges.
+      const subject = 'bemi-subject'
+      const records = [orphanContext(subject), ...pairedTransaction(subject, 4999, 5000)]
+
+      const result = stitchFetchedRecords({
+        fetchedRecordBuffer: new FetchedRecordBuffer().addFetchedRecords(records),
+        useBuffer: true,
+      })
+
+      expect(result.newFetchedRecordBuffer.size()).toEqual(0)
+      expect(result.ackStreamSequence).toEqual(5000)
+    })
+
+    test('keeps a context whose change has simply not caught up yet', () => {
+      const subject = 'bemi-subject'
+      const records = [orphanContext(subject), ...pairedTransaction(subject, 19, 20)]
+
+      const result = stitchFetchedRecords({
+        fetchedRecordBuffer: new FetchedRecordBuffer().addFetchedRecords(records),
+        useBuffer: true,
+      })
+
+      expect(result.newFetchedRecordBuffer.size()).toEqual(1)
+      // Clamped below the buffered context so it is not purged from the stream.
+      expect(result.ackStreamSequence).toBeUndefined()
+    })
+
     test('buffers every context of a transaction whose change has not arrived', () => {
       // Two contexts happen while both emitters are live. Counting records
       // treated that as paired, so both were dropped and the change - arriving

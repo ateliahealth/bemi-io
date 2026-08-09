@@ -6,7 +6,7 @@
 # CI reports them separately:
 #
 #   setup baseline downtime negative-control backpressure recovery kill-restart
-#   slot-alarm capture-filter context-emit
+#   slot-alarm capture-filter context-emit client-contract
 #
 # `all` runs them in order, which is what you want locally.
 #
@@ -294,6 +294,15 @@ SQL
   pass "context stitched onto the committed change, aborted transaction left nothing behind, duplicate contexts resolved to the first"
 }
 
+step_client_contract() {
+  # 0.1.0 shipped broken because nothing called the package through the driver
+  # its consumers use - psql handles pg_lsn, Prisma does not.
+  DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:55432/appdb" \
+    pnpm --filter @atelia/pg-change-context run test:integration >/dev/null 2>&1 \
+    || fail "the package does not work through a Prisma client"
+  pass "package emits successfully through a real Prisma client"
+}
+
 case "${1:-all}" in
   setup) step_setup ;;
   baseline) step_baseline ;;
@@ -305,9 +314,10 @@ case "${1:-all}" in
   slot-alarm) step_slot_alarm ;;
   capture-filter) step_capture_filter ;;
   context-emit) step_context_emit ;;
+  client-contract) step_client_contract ;;
   all)
     rc=0
-    for s in setup baseline downtime negative-control backpressure recovery kill-restart slot-alarm capture-filter context-emit; do
+    for s in setup baseline downtime negative-control backpressure recovery kill-restart slot-alarm capture-filter context-emit client-contract; do
       printf '\n=== %s ===\n' "$s"
       "$0" "$s" || { rc=1; break; }
     done

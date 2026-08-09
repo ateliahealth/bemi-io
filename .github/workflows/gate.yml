@@ -45,6 +45,21 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v4
 
+      # For the client-contract step, which drives the package through a real
+      # Prisma client against the compose database.
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - uses: pnpm/action-setup@v4
+        name: Install pnpm
+        with:
+          run_install: false
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
       - name: Stand up the pipeline
         run: ./scripts/compose-gate.sh setup
 
@@ -74,6 +89,9 @@ jobs:
 
       - name: Context survives commit and is discarded on rollback
         run: ./scripts/compose-gate.sh context-emit
+
+      - name: The package works through a Prisma client
+        run: ./scripts/compose-gate.sh client-contract
 
       - name: Service logs on failure
         if: failure()

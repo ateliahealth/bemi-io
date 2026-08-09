@@ -1,0 +1,11 @@
+// Minimal schema: this exists only so a Prisma client can be generated for the
+// integration test. No models - the package issues raw SQL and never touches
+// one.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}

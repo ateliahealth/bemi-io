@@ -38,7 +38,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.spec.json",
     "format": "prettier --write --ignore-path ../.prettierignore src",
     "format:check": "prettier --check --ignore-path ../.prettierignore src",
-    "lint": "oxlint src"
+    "lint": "oxlint src",
+    "test:integration": "prisma generate && vitest run --config vitest.integration.config.mts"
   },
   "license": "MIT",
   "publishConfig": {
@@ -46,7 +47,9 @@
     "provenance": true
   },
   "devDependencies": {
+    "@prisma/client": "^6.5.0",
     "@types/node": "catalog:",
+    "prisma": "^6.5.0",
     "typescript": "catalog:",
     "vitest": "^4.1.10"
   },
