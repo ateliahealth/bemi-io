@@ -1,6 +1,6 @@
 {
   "name": "@atelia/pg-change-context",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Emit application context alongside PostgreSQL data changes for logical-decoding CDC",
   "keywords": [
     "postgresql",

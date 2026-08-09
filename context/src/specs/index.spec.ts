@@ -30,6 +30,9 @@ describe('emitChangeContext', () => {
       // message carries no transaction id, so it can never be paired with the
       // changes it describes, and it would not roll back with them.
       expect(calls[0].query).toContain('pg_logical_emit_message(true,')
+      // pg_lsn is undeserializable by Prisma, so the cast is part of the
+      // contract with the driver rather than cosmetic.
+      expect(calls[0].query).toContain('::text')
       expect(calls[0].values).toStrictEqual([CONTEXT_MESSAGE_PREFIX, '{"tenantId":"t1","userId":"u1"}'])
     })
   })
