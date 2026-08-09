@@ -34,6 +34,7 @@ Bemi automatically tracks database changes ensuring 100% reliability and a compr
   - [Running with Devbox](#running-with-devbox)
   - [Running natively](#running-natively)
 - [Contextualizing data changes](#contextualizing-data-changes)
+- [Limiting what is captured](#limiting-what-is-captured)
 - [Architecture](#architecture)
 - [Testing](#testing)
 - [License](#license)
