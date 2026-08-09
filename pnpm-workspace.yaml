@@ -20,5 +20,6 @@ catalog:
   '@mikro-orm/postgresql': ^7.1.11
   '@mikro-orm/sql-highlighter': ^1.0.1
   '@types/node': ^24.10.1
-  nats: ^2.29.3
+  '@nats-io/jetstream': ^3.4.0
+  '@nats-io/transport-node': ^3.4.0
   typescript: ^7.0.2

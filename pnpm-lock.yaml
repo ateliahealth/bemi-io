@@ -21,12 +21,15 @@ catalogs:
     '@mikro-orm/sql-highlighter':
       specifier: ^1.0.1
       version: 1.0.1
+    '@nats-io/jetstream':
+      specifier: ^3.4.0
+      version: 3.4.0
+    '@nats-io/transport-node':
+      specifier: ^3.4.0
+      version: 3.4.0
     '@types/node':
       specifier: ^24.10.1
       version: 24.13.3
-    nats:
-      specifier: ^2.29.3
-      version: 2.29.3
     typescript:
       specifier: ^7.0.2
       version: 7.0.2
@@ -65,9 +68,12 @@ importers:
       '@mikro-orm/postgresql':
         specifier: 'catalog:'
         version: 7.1.11(@mikro-orm/core@7.1.11(dataloader@2.2.3))
-      nats:
+      '@nats-io/jetstream':
         specifier: 'catalog:'
-        version: 2.29.3
+        version: 3.4.0
+      '@nats-io/transport-node':
+        specifier: 'catalog:'
+        version: 3.4.0
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -99,9 +105,12 @@ importers:
       '@mikro-orm/sql-highlighter':
         specifier: 'catalog:'
         version: 1.0.1
-      nats:
+      '@nats-io/jetstream':
         specifier: 'catalog:'
-        version: 2.29.3
+        version: 3.4.0
+      '@nats-io/transport-node':
+        specifier: 'catalog:'
+        version: 3.4.0
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -321,6 +330,24 @@ packages:
     engines: {node: '>= 22.17.0'}
     peerDependencies:
       '@mikro-orm/core': 7.1.11
+
+  '@nats-io/jetstream@3.4.0':
+    resolution: {integrity: sha512-GzHQodNJ942+R5LRb8PuZ5ugVWVWMRiufxUYLLVWkXKfwDXYN+Owo0d7L/b9O7BPyrbYD7jQWAC6+ZVuXa9Gyw==}
+
+  '@nats-io/nats-core@3.4.0':
+    resolution: {integrity: sha512-QMDM86EUNm+wudlKC67HLar/KHHQUvJGLfb4jbahje3pUk3K9afeck9fwsxBZF0eUFox6T/TA6m/t+lQqf+QsQ==}
+
+  '@nats-io/nkeys@2.0.3':
+    resolution: {integrity: sha512-JVt56GuE6Z89KUkI4TXUbSI9fmIfAmk6PMPknijmuL72GcD+UgIomTcRWiNvvJKxA01sBbmIPStqJs5cMRBC3A==}
+    engines: {node: '>=18.0.0'}
+
+  '@nats-io/nuid@3.0.0':
+    resolution: {integrity: sha512-QbXZDrxmYlrn5AD06gYcUTmEHwxn96HBQMIk7XTjDlEcx6FPzVBBPjp4AMRh1lEv6B4iJ6Xb/Uz61JugPXFRQg==}
+    engines: {node: '>= 22.x'}
+
+  '@nats-io/transport-node@3.4.0':
+    resolution: {integrity: sha512-hH7u7ejIBTFEJIZ8rIcMrHJI6wl+HhpO5sVFs1+ppmXa8RuB2+Lh1+UwTzZ5xTNNm1TKcRkYy+2qCV56qp8RxA==}
+    engines: {node: '>= 18.0.0'}
 
   '@oxc-project/types@0.143.0':
     resolution: {integrity: sha512-u6JZdLBTLotrNC9Vd6vPssINdzcCzleKAH6EJKImQb7GtYvX5keN2dxkoK44stCc4tffE6QQRtZTXVSzsLUlWA==}
@@ -992,15 +1019,6 @@ packages:
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
     hasBin: true
 
-  nats@2.29.3:
-    resolution: {integrity: sha512-tOQCRCwC74DgBTk4pWZ9V45sk4d7peoE2njVprMRCBXrhJ5q5cYM7i6W+Uvw2qUrcfOSnuisrX7bEx3b3Wx4QA==}
-    engines: {node: '>= 14.0.0'}
-    deprecated: Package moved. Use @nats-io/transport-node from https://github.com/nats-io/nats.js
-
-  nkeys.js@1.1.0:
-    resolution: {integrity: sha512-tB/a0shZL5UZWSwsoeyqfTszONTt4k2YS0tuQioMOD180+MbombYVgzDUYHlx+gejYK6rgf08n/2Df99WY0Sxg==}
-    engines: {node: '>=10.0.0'}
-
   obug@2.1.4:
     resolution: {integrity: sha512-4a+OsYv9UktOJKE+l1A4OufDgdRF9PifWj+tJnHURo/P+WOxpG4GzUFL9qCalmWauao6ogiG+QvnCovwPoyAWA==}
     engines: {node: '>=12.20.0'}
@@ -1479,6 +1497,27 @@ snapshots:
       '@mikro-orm/core': 7.1.11(dataloader@2.2.3)
       kysely: 0.29.4
 
+  '@nats-io/jetstream@3.4.0':
+    dependencies:
+      '@nats-io/nats-core': 3.4.0
+
+  '@nats-io/nats-core@3.4.0':
+    dependencies:
+      '@nats-io/nkeys': 2.0.3
+      '@nats-io/nuid': 3.0.0
+
+  '@nats-io/nkeys@2.0.3':
+    dependencies:
+      tweetnacl: 1.0.3
+
+  '@nats-io/nuid@3.0.0': {}
+
+  '@nats-io/transport-node@3.4.0':
+    dependencies:
+      '@nats-io/nats-core': 3.4.0
+      '@nats-io/nkeys': 2.0.3
+      '@nats-io/nuid': 3.0.0
+
   '@oxc-project/types@0.143.0': {}
 
   '@oxlint/binding-android-arm-eabi@1.77.0':
@@ -1943,14 +1982,6 @@ snapshots:
   mimic-function@5.0.1: {}
 
   nanoid@3.3.18: {}
-
-  nats@2.29.3:
-    dependencies:
-      nkeys.js: 1.1.0
-
-  nkeys.js@1.1.0:
-    dependencies:
-      tweetnacl: 1.0.3
 
   obug@2.1.4: {}
 

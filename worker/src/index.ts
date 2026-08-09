@@ -1,7 +1,7 @@
 // Part of a fork of Bemi (https://github.com/BemiHQ/bemi-io),
 // modified by Atelia Health, 2026. Licensed under SSPL-1.0; see LICENSE.
 import http from 'http'
-import { AckPolicy, DeliverPolicy } from 'nats'
+import { AckPolicy, DeliverPolicy, jetstreamManager } from '@nats-io/jetstream'
 import { MikroORM } from '@mikro-orm/postgresql'
 
 import { connectJetstream, buildConsumer, runIngestionLoop } from '@bemi-db/core'
@@ -46,7 +46,7 @@ const serveHealth = () => {
     },
   })
 
-  const jetstreamManager = await jetstreamConnection.jetstreamManager()
+  const manager = await jetstreamManager(jetstreamConnection)
 
   const orm = await MikroORM.init(mikroOrmConfig)
   await orm.migrator.up()
@@ -60,7 +60,7 @@ const serveHealth = () => {
     // `seq` purges up to but not including it, so acked messages are released
     // and the stream only holds what is not yet durable in the audit database.
     onAcked: async (ackedStreamSequence) => {
-      await jetstreamManager.streams.purge('DebeziumStream', { seq: ackedStreamSequence + 1 })
+      await manager.streams.purge('DebeziumStream', { seq: ackedStreamSequence + 1 })
     },
   })
 })()
