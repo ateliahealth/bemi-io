@@ -50,7 +50,7 @@
   "devDependencies": {
     "@prisma/client": "6.19.3",
     "@types/node": "catalog:",
-    "prisma": "^6.5.0",
+    "prisma": "6.19.3",
     "typescript": "catalog:",
     "vitest": "^4.1.10"
   },
