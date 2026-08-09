@@ -95,6 +95,9 @@ jobs:
       - name: An abandoned replication slot is reported
         run: ./scripts/compose-gate.sh slot-alarm
 
+      - name: Capture filtering excludes only what it should
+        run: ./scripts/compose-gate.sh capture-filter
+
       - name: Service logs on failure
         if: failure()
         run: docker compose logs --tail 200

@@ -9,6 +9,7 @@ import {
   buildConsumer,
   runIngestionLoop,
   readReplicationSlots,
+  parseIgnoreFields,
   observeSlots,
   logSlotWarnings,
   logger,
@@ -33,6 +34,10 @@ const SLOT_RETENTION_WARN_BYTES = Number(process.env.BEMI_SLOT_RETENTION_WARN_BY
 // condition this catches takes days to become expensive, so erring long costs
 // little and erring short costs the alarm's credibility.
 const SLOT_INACTIVE_GRACE_MS = Number(process.env.BEMI_SLOT_INACTIVE_GRACE_MS) || 15 * 60 * 1000
+// Fields whose change alone does not justify a change record - a timestamp an
+// ORM bumps on every write being the motivating case. Empty by default, so the
+// pipeline records everything unless someone opts out explicitly.
+const IGNORE_FIELDS = parseIgnoreFields(process.env.BEMI_IGNORE_FIELDS)
 
 let lastTickAt = Date.now()
 let lastSlots: ReplicationSlotState[] = []
@@ -133,9 +138,14 @@ const pollReplicationSlots = (orm: MikroORM) => {
 
   pollReplicationSlots(orm)
 
+  if (IGNORE_FIELDS.length) {
+    logger.info(`Capture filter: ignoring field-only changes to ${IGNORE_FIELDS.join(', ')}`)
+  }
+
   await runIngestionLoop({
     orm,
     consumer,
+    ignoreFields: IGNORE_FIELDS,
     onTick: () => {
       lastTickAt = Date.now()
     },

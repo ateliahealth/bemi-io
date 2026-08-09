@@ -8,6 +8,7 @@ import 'reflect-metadata'
 
 export { connectJetstream, ensureDebeziumStream, buildConsumer, decodeData, encodeData } from './nats'
 export { runIngestionLoop } from './ingestion'
+export { parseIgnoreFields, filterEmptyChanges, isEmptyChange } from './capture-filter'
 export {
   readReplicationSlots,
   observeSlots,

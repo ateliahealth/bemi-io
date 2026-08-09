@@ -81,6 +81,11 @@ services:
       <<: *source-env
       NATS_URL: nats://nats:4222
       BEMI_RESET_SLOT: '${BEMI_RESET_SLOT:-false}'
+      # Capture filtering. Empty by default: the pipeline records everything
+      # unless a deployment opts out, because the failure mode of both is
+      # silently capturing less than intended.
+      BEMI_EXCLUDE_TABLES: '${BEMI_EXCLUDE_TABLES:-}'
+      BEMI_EXCLUDE_COLUMNS: '${BEMI_EXCLUDE_COLUMNS:-}'
     depends_on:
       stream-setup: { condition: service_completed_successfully }
 
@@ -104,6 +109,9 @@ services:
       # does not page. Compressed here to keep the gate short; the gate scopes
       # its log search to its own step so earlier restarts still do not count.
       BEMI_SLOT_INACTIVE_GRACE_MS: '10000'
+      # Field-only changes not worth a record. Distinct from
+      # BEMI_EXCLUDE_COLUMNS: the field stays in the payload of kept changes.
+      BEMI_IGNORE_FIELDS: '${BEMI_IGNORE_FIELDS:-}'
     depends_on:
       stream-setup: { condition: service_completed_successfully }
 

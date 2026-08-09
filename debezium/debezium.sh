@@ -4,6 +4,13 @@
 #
 NATS_URL="${NATS_URL:-nats://127.0.0.1:4222}" &&
 BEMI_SLOT_NAME="${BEMI_SLOT_NAME:-bemi_local}" &&
+# Built here rather than templated with a bare placeholder: an unset variable
+# would otherwise substitute to empty and leave a trailing comma, which
+# Debezium reads as an empty pattern rather than as an error.
+TABLE_EXCLUDE_LIST="public.changes" &&
+if [ -n "${BEMI_EXCLUDE_TABLES:-}" ]; then
+  TABLE_EXCLUDE_LIST="${TABLE_EXCLUDE_LIST},${BEMI_EXCLUDE_TABLES}"
+fi &&
 PROPERTIES=$(<application.properties) &&
 PROPERTIES="${PROPERTIES//DB_HOST/$DB_HOST}" &&
 PROPERTIES="${PROPERTIES//DB_PORT/$DB_PORT}" &&
@@ -12,6 +19,18 @@ PROPERTIES="${PROPERTIES//DB_USER/$DB_USER}" &&
 PROPERTIES="${PROPERTIES//DB_PASSWORD/$DB_PASSWORD}" &&
 PROPERTIES="${PROPERTIES//NATS_URL/$NATS_URL}" &&
 PROPERTIES="${PROPERTIES//BEMI_SLOT_NAME/$BEMI_SLOT_NAME}" &&
+PROPERTIES="${PROPERTIES//BEMI_TABLE_EXCLUDE_LIST/$TABLE_EXCLUDE_LIST}" &&
+# Appended rather than templated, so the property is absent altogether when
+# unset. An empty column.exclude.list is not equivalent to no list.
+if [ -n "${BEMI_EXCLUDE_COLUMNS:-}" ]; then
+  PROPERTIES="${PROPERTIES}
+debezium.source.column.exclude.list=${BEMI_EXCLUDE_COLUMNS}"
+fi &&
+# Logged because every one of these silently removes audit data when wrong, and
+# a typo produces a working pipeline that captures less than intended. The
+# resolved values, not the raw variables - the point is to show what took
+# effect.
+echo "Capture filter: tables excluded = ${TABLE_EXCLUDE_LIST}; columns excluded = ${BEMI_EXCLUDE_COLUMNS:-<none>}" &&
 # config/, not conf/: the dist renamed the directory in 3.x, and run.sh puts
 # config on the classpath from there. Writing to the old path leaves the server
 # with no configuration at all rather than failing loudly.
