@@ -25,25 +25,31 @@ grep -q '"license": "MIT"' "$PKG/package.json" || fail "$PKG/package.json does n
 
 # Any dependency on a workspace package is a licence problem, not just the ones
 # named today, so this matches the scope rather than specific package names.
-if grep -nE '"@bemi-db/' "$PKG/package.json" >/dev/null 2>&1; then
-  grep -nE '"@bemi-db/' "$PKG/package.json" >&2
-  fail "$PKG depends on an SSPL workspace package"
+# `workspace:` catches a local package referenced under any other name.
+if grep -nE '"@bemi-db/|workspace:' "$PKG/package.json" >/dev/null 2>&1; then
+  grep -nE '"@bemi-db/|workspace:' "$PKG/package.json" >&2
+  fail "$PKG depends on a workspace package"
 fi
 
-# Imports, including type-only ones: `import type` still creates the dependency
-# for licensing purposes even though it emits nothing.
-offenders=$(grep -rnE "from '(@bemi-db/|\.\./\.\./(core|worker))" "$PKG/src" 2>/dev/null || true)
+# Matched on the specifier appearing at all, not on `from '...'`. An earlier
+# version keyed on static import syntax, which `require()`, dynamic `import()`
+# and double-quoted specifiers all slip past - and a boundary that only holds
+# for the syntax someone happened to think of is not a boundary. There is no
+# legitimate reason to name an SSPL package in here at all, including in a
+# comment, so any mention fails.
+offenders=$(grep -rnF '@bemi-db/' "$PKG/src" 2>/dev/null || true)
 if [ -n "$offenders" ]; then
   echo "$offenders" >&2
-  fail "$PKG imports from an SSPL package"
+  fail "$PKG references an SSPL package"
 fi
 
-# A relative path escaping the package reaches SSPL code regardless of what it
-# resolves to, so it is rejected on shape rather than on destination.
-escapes=$(grep -rnE "from '\.\./\.\./\.\." "$PKG/src" 2>/dev/null || true)
+# A relative path leaving the package reaches SSPL code whatever it resolves
+# to, so it is rejected on shape rather than destination - and again on the
+# specifier rather than the import form.
+escapes=$(grep -rnE "['\"]\.\./\.\." "$PKG/src" 2>/dev/null || true)
 if [ -n "$escapes" ]; then
   echo "$escapes" >&2
-  fail "$PKG imports from outside its own directory"
+  fail "$PKG references a path outside its own directory"
 fi
 
 # The SSPL notice must not appear here: it would assert the file is part of the

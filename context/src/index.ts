@@ -71,11 +71,34 @@ export const emitChangeContext = async (
   // to an empty object anyway, at the cost of a WAL record per transaction.
   if (Object.keys(context).length === 0) return false
 
-  let payload: string
+  // JSON.stringify drops function and symbol values without complaint, so a
+  // field can vanish between the caller and the log while this returns
+  // success. That is the failure this package exists to prevent, so they are
+  // rejected rather than dropped.
+  //
+  // `undefined` is deliberately not rejected. It is what optional chaining
+  // produces - `userId: user?.id` on an unauthenticated request - and it means
+  // the field genuinely has no value, not that a value was lost. Throwing
+  // there would turn every anonymous request into an error.
+  const droppedFields: string[] = []
+  let payload: string | undefined
   try {
-    payload = JSON.stringify(context)
+    payload = JSON.stringify(context, (key, value) => {
+      const type = typeof value
+      if (type === 'function' || type === 'symbol') {
+        droppedFields.push(key)
+        return undefined
+      }
+      return value
+    })
   } catch (e) {
     throw new ChangeContextError(`Context is not JSON-serialisable: ${(e as Error).message}`)
+  }
+
+  if (droppedFields.length) {
+    throw new ChangeContextError(
+      `Context fields cannot be serialised and would be silently dropped: ${droppedFields.join(', ')}`,
+    )
   }
 
   // JSON.stringify returns undefined for values it cannot represent at the top
@@ -83,6 +106,11 @@ export const emitChangeContext = async (
   if (payload === undefined) {
     throw new ChangeContextError('Context serialised to undefined')
   }
+
+  // Checked after serialising, not before. A context of nothing but undefined
+  // values has keys but no content, and emitting it would put an empty object
+  // in the log while reporting that context was recorded.
+  if (payload === '{}') return false
 
   const byteLength = Buffer.byteLength(payload, 'utf8')
   if (byteLength > maxBytes) {

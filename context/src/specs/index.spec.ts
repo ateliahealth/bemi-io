@@ -86,6 +86,46 @@ describe('emitChangeContext', () => {
     await expect(emitChangeContext(client, context)).rejects.toThrow(/bytes, over the/)
   })
 
+  test('allows undefined values, which is what optional chaining produces', async () => {
+    // `userId: request.user?.id` on an unauthenticated request. The field has
+    // no value rather than a lost one, so this must not throw - doing so would
+    // turn every anonymous request into an error.
+    const { client, calls } = executor()
+
+    expect(await emitChangeContext(client, { tenantId: 't1', userId: undefined })).toBe(true)
+    expect(calls[0].values[1]).toStrictEqual('{"tenantId":"t1"}')
+  })
+
+  test('does not emit when every value was undefined', async () => {
+    // Has keys, but no content once serialised. Emitting would put an empty
+    // object in the log while reporting that context was recorded.
+    const { client, calls } = executor()
+
+    expect(await emitChangeContext(client, { tenantId: undefined, userId: undefined })).toBe(false)
+    expect(calls).toHaveLength(0)
+  })
+
+  test('refuses values JSON.stringify would drop without complaint', async () => {
+    // Functions and symbols vanish silently, so a field disappears between the
+    // caller and the log while this reports success. That is precisely the
+    // silent attribution loss this package exists to prevent.
+    const { client, calls } = executor()
+
+    await expect(emitChangeContext(client, { tenantId: 't1', fn: () => undefined })).rejects.toThrow(
+      /silently dropped: fn/,
+    )
+    await expect(emitChangeContext(client, { tenantId: 't1', sym: Symbol('s') })).rejects.toThrow(/silently dropped/)
+    expect(calls).toHaveLength(0)
+  })
+
+  test('catches unserialisable values nested inside the context', async () => {
+    const { client } = executor()
+
+    await expect(emitChangeContext(client, { actor: { id: 1, resolve: () => undefined } })).rejects.toThrow(
+      /silently dropped: resolve/,
+    )
+  })
+
   test('rejects values that cannot be serialised', async () => {
     const { client, calls } = executor()
     const circular: Record<string, unknown> = {}
