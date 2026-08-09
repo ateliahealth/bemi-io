@@ -85,11 +85,17 @@ understood, and this package cannot outlive it.
 
 | Input                       | Result                              |
 | --------------------------- | ----------------------------------- |
-| Empty context `{}`          | No emit, returns `false`            |
+| Empty context `{}`          | Returns without emitting            |
 | Context over the byte limit | Throws — never truncated or skipped |
 | Non-serialisable value      | Throws                              |
 | Not a plain object          | Throws                              |
 | Executor rejects            | Propagates                          |
+
+It returns `void`. Every failure throws, so there is no result to check and no
+way to ignore one — a call that returns normally either emitted or had nothing
+to emit. A boolean would have to be checked to mean anything, and an unchecked
+return that quietly meant "did nothing" is the shape of bug this package exists
+to remove.
 
 Nothing here fails quietly. A context that did not reach the log means changes
 will be attributed to nobody, and only the caller can decide whether that

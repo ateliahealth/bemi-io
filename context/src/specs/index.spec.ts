@@ -24,8 +24,7 @@ describe('emitChangeContext', () => {
   test('emits a transactional message with the agreed prefix and a JSON payload', () => {
     const { client, calls } = executor()
 
-    return emitChangeContext(client, { tenantId: 't1', userId: 'u1' }).then((emitted) => {
-      expect(emitted).toBe(true)
+    return emitChangeContext(client, { tenantId: 't1', userId: 'u1' }).then(() => {
       expect(calls).toHaveLength(1)
       // The literal `true` is the transactional flag. A non-transactional
       // message carries no transaction id, so it can never be paired with the
@@ -63,7 +62,9 @@ describe('emitChangeContext', () => {
   test('does not emit when there is no context', async () => {
     const { client, calls } = executor()
 
-    expect(await emitChangeContext(client, {})).toBe(false)
+    // Returns without emitting rather than throwing: a background job or an
+    // unauthenticated request legitimately has no context.
+    await emitChangeContext(client, {})
     expect(calls).toHaveLength(0)
   })
 
@@ -92,7 +93,7 @@ describe('emitChangeContext', () => {
     // turn every anonymous request into an error.
     const { client, calls } = executor()
 
-    expect(await emitChangeContext(client, { tenantId: 't1', userId: undefined })).toBe(true)
+    await emitChangeContext(client, { tenantId: 't1', userId: undefined })
     expect(calls[0].values[1]).toStrictEqual('{"tenantId":"t1"}')
   })
 
@@ -101,7 +102,7 @@ describe('emitChangeContext', () => {
     // object in the log while reporting that context was recorded.
     const { client, calls } = executor()
 
-    expect(await emitChangeContext(client, { tenantId: undefined, userId: undefined })).toBe(false)
+    await emitChangeContext(client, { tenantId: undefined, userId: undefined })
     expect(calls).toHaveLength(0)
   })
 

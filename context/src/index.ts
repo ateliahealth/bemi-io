@@ -56,20 +56,26 @@ const EMIT_SQL = 'SELECT pg_logical_emit_message(true, $1, $2)'
  * wrong, because getting it wrong produces changes saved with no context:
  * silent, and indistinguishable from an application path that never set any.
  *
- * Returns false without emitting when there is no context to record.
+ * Returns nothing. Every failure throws, so there is no result to check and no
+ * way to ignore one - a caller that returns normally has emitted, or had
+ * nothing to emit. A boolean would have to be checked to mean anything, and an
+ * unchecked return that silently meant "did nothing" is the shape of bug this
+ * package exists to remove.
  */
 export const emitChangeContext = async (
   executor: RawQueryExecutor,
   context: Record<string, unknown>,
   { maxBytes = DEFAULT_MAX_CONTEXT_BYTES }: { maxBytes?: number } = {},
-): Promise<boolean> => {
+): Promise<void> => {
   if (!context || typeof context !== 'object' || Array.isArray(context)) {
     throw new ChangeContextError('Context must be a plain object')
   }
 
   // Nothing to record. Emitting would produce a message the consumer resolves
   // to an empty object anyway, at the cost of a WAL record per transaction.
-  if (Object.keys(context).length === 0) return false
+  // Not an error: a background job or an unauthenticated request legitimately
+  // has no context, and throwing would make the common case exceptional.
+  if (Object.keys(context).length === 0) return
 
   // JSON.stringify drops function and symbol values without complaint, so a
   // field can vanish between the caller and the log while this returns
@@ -110,7 +116,7 @@ export const emitChangeContext = async (
   // Checked after serialising, not before. A context of nothing but undefined
   // values has keys but no content, and emitting it would put an empty object
   // in the log while reporting that context was recorded.
-  if (payload === '{}') return false
+  if (payload === '{}') return
 
   const byteLength = Buffer.byteLength(payload, 'utf8')
   if (byteLength > maxBytes) {
@@ -124,6 +130,4 @@ export const emitChangeContext = async (
   // frequently contains quotes; building this statement by concatenation would
   // be both fragile and injectable.
   await executor.$queryRawUnsafe(EMIT_SQL, CONTEXT_MESSAGE_PREFIX, payload)
-
-  return true
 }
