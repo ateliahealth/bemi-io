@@ -243,6 +243,12 @@ step_context_emit() {
   # Rollback runs first and commit second, so the commit doubles as the control.
   # Asserting "the aborted row is absent" on its own would pass just as happily
   # against a dead pipeline.
+  # Before the write, not after: the worker can persist it within the second,
+  # and a target read afterwards already includes it - so the wait would sit
+  # out its full timeout for a row that already landed.
+  local target
+  target=$(( $(count) + 1 ))
+
   docker exec -i bemi-db-1 psql -U postgres -d appdb -q >/dev/null 2>&1 <<'SQL' || fail "could not run the context transactions"
 BEGIN;
 SELECT pg_logical_emit_message(true, '_bemi', '{"tenantId":"ctx-aborted"}');
@@ -254,8 +260,6 @@ INSERT INTO todos (title) VALUES ('ctx-commit');
 COMMIT;
 SQL
 
-  local target
-  target=$(( $(count) + 1 ))
   wait_count "$target" 40 || fail "the committed write never landed; the pipeline is not capturing"
 
   # Give the aborted transaction the same opportunity to appear as the
@@ -271,6 +275,8 @@ SQL
 
   # Both emitters live at once. The batch-split half is unit-tested instead;
   # it cannot be forced deterministically here.
+  target=$(( $(count) + 1 ))
+
   docker exec -i bemi-db-1 psql -U postgres -d appdb -q >/dev/null 2>&1 <<'SQL' || fail "could not run the double-context transaction"
 BEGIN;
 SELECT pg_logical_emit_message(true, '_bemi', '{"tenantId":"ctx-first"}');
@@ -279,7 +285,6 @@ INSERT INTO todos (title) VALUES ('ctx-double');
 COMMIT;
 SQL
 
-  target=$(( $(count) + 1 ))
   wait_count "$target" 40 || fail "the double-context write never landed"
 
   local double_context
