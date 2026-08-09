@@ -1,3 +1,5 @@
+// Part of a fork of Bemi (https://github.com/BemiHQ/bemi-io),
+// modified by Atelia Health, 2026. Licensed under SSPL-1.0; see LICENSE.
 import { logger } from './logger'
 import { FetchedRecord } from './fetched-record'
 import { FetchedRecordBuffer } from './fetched-record-buffer'
@@ -51,6 +53,13 @@ export const stitchFetchedRecords = ({
 
       // Context message (non-mutation) - skip it, it'll be used later
       if (fetchedRecord.isContextMessage()) {
+        // Unless its change has not arrived. A change with no context is still
+        // savable, so it can be released; a context with no change is not, and
+        // dropping it here means a later ack purges it and the change is saved
+        // with no application context. Buffer it instead.
+        if (useBuffer && sameTransactionIdFetchedRecords.length === 1) {
+          newFetchedRecordBuffer = newFetchedRecordBuffer.addFetchedRecord(fetchedRecord)
+        }
         return
       }
 
@@ -92,6 +101,27 @@ export const stitchFetchedRecords = ({
     ackStreamSequence = maxSequenceBySubject[subjectWithMaxSequence!]
   } else {
     ackStreamSequence = maxSequence
+  }
+
+  // Never ack at or past anything left in the buffer. The ack drives the purge,
+  // so acking past a buffered record removes it from the stream while it exists
+  // only in this process's memory - a restart before the next batch loses it.
+  // Computed here rather than in the loop, because a record buffered early can
+  // still be released later in the same pass.
+  let minBufferedSequence: number | undefined = undefined
+  newFetchedRecordBuffer.forEach((_subject, records) => {
+    records.forEach((record) => {
+      if (minBufferedSequence === undefined || record.streamSequence < minBufferedSequence) {
+        minBufferedSequence = record.streamSequence
+      }
+    })
+  })
+  if (
+    ackStreamSequence !== undefined &&
+    minBufferedSequence !== undefined &&
+    ackStreamSequence >= minBufferedSequence
+  ) {
+    ackStreamSequence = minBufferedSequence > 1 ? minBufferedSequence - 1 : undefined
   }
 
   logger.debug({

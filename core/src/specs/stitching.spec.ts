@@ -180,6 +180,40 @@ describe('stitchFetchedRecords', () => {
       })
     })
 
+    test('buffers an unpaired context even when a heartbeat follows it', () => {
+      const subject = 'bemi-subject'
+      const fetchedRecords = [
+        new FetchedRecord({
+          subject,
+          streamSequence: 1,
+          changeAttributes: { ...CHANGE_ATTRIBUTES.CREATE_MESSAGE, transactionId: 1 },
+          messagePrefix: MESSAGE_PREFIX_CONTEXT,
+        }),
+        new FetchedRecord({
+          subject,
+          streamSequence: 2,
+          changeAttributes: { ...CHANGE_ATTRIBUTES.HEARTBEAT_MESSAGE, transactionId: 2 },
+          messagePrefix: MESSAGE_PREFIX_HEARTBEAT,
+        }),
+      ]
+
+      const result = stitchFetchedRecords({
+        fetchedRecordBuffer: new FetchedRecordBuffer().addFetchedRecords(fetchedRecords),
+        useBuffer: true,
+      })
+
+      // The context must survive into the next batch. Acking the heartbeat
+      // purges everything below it, so a context dropped here is gone and the
+      // change it belongs to is later saved with no application context.
+      expect(result.newFetchedRecordBuffer).toStrictEqual(
+        new FetchedRecordBuffer().addFetchedRecords([findFetchedRecord(fetchedRecords, 1)]),
+      )
+      expect(result.stitchedFetchedRecords).toStrictEqual([])
+      // Nothing may be acked: the buffered context is only in memory until the
+      // next batch, so purging it from the stream would lose it on a restart.
+      expect(result.ackStreamSequence).toBeUndefined()
+    })
+
     test('acks the last heartbeat message if the buffer is empty', () => {
       const subject = 'bemi-subject'
       const fetchedRecords = [
