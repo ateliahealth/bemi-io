@@ -6,6 +6,7 @@
 # CI reports them separately:
 #
 #   setup baseline downtime negative-control backpressure recovery kill-restart
+#   slot-alarm
 #
 # `all` runs them in order, which is what you want locally.
 #
@@ -125,6 +126,58 @@ step_kill_restart() {
   pass "each service recovered and the pipeline resumed:$detail"
 }
 
+step_slot_alarm() {
+  # An abandoned slot is invisible to the pipeline - it produces no records, so
+  # nothing in the data path can notice it. Simulated exactly: create a slot
+  # with no consumer and check the worker reports it anyway.
+  # Scoped to this step. The earlier steps kill the consumer, which genuinely
+  # makes bemi_local inactive for a few seconds, and those lines are correct
+  # observations that would otherwise be counted here as false positives.
+  local since
+  since=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+  $PSQL_APP "select pg_create_logical_replication_slot('bemi_orphan','pgoutput');" >/dev/null 2>&1 \
+    || fail "could not create the orphan slot"
+
+  # Must outlast the grace period, not just a poll interval: the first
+  # observation deliberately stays silent.
+  local hits=0
+  for _ in $(seq 1 30); do
+    # grep -c, not -q: -q exits on first match and the resulting SIGPIPE trips
+    # pipefail, so a match reads as a failure once the log outgrows the buffer.
+    hits=$(docker compose logs --since "$since" worker 2>/dev/null | grep -c 'BEMI_SLOT_WARNING inactive.*bemi_orphan' || true)
+    [ "$hits" -gt 0 ] && break
+    sleep 2
+  done
+  [ "$hits" -gt 0 ] || {
+    $PSQL_APP "select pg_drop_replication_slot('bemi_orphan');" >/dev/null 2>&1
+    fail "the worker never reported the abandoned slot"
+  }
+
+  # The live slot must not be reported as inactive alongside it, or the alarm
+  # fires permanently and gets muted.
+  local false_positives
+  false_positives=$(docker compose logs --since "$since" worker 2>/dev/null | grep -c 'BEMI_SLOT_WARNING inactive.*bemi_local' || true)
+
+  $PSQL_APP "select pg_drop_replication_slot('bemi_orphan');" >/dev/null 2>&1 \
+    || fail "could not drop the orphan slot"
+
+  [ "$false_positives" = 0 ] || fail "the active slot was reported inactive $false_positives times"
+
+  # The endpoint has to carry the same fact, so an alert can be built on either
+  # the log line or a scrape without the two disagreeing.
+  local reported
+  reported=$(docker exec bemi-worker-1 node -e \
+    "require('http').get('http://127.0.0.1:8081/healthz',r=>{let b='';r.on('data',c=>b+=c);r.on('end',()=>{const j=JSON.parse(b);console.log(j.replicationSlots.map(s=>s.slotName+':'+s.active).join(','))})})" \
+    2>/dev/null | tr -d '[:space:]')
+  case "$reported" in
+    *bemi_local:true*) ;;
+    *) fail "/healthz did not report the live slot: '$reported'" ;;
+  esac
+
+  pass "abandoned slot reported in $hits log lines, no false positive on the live slot, /healthz agrees ($reported)"
+}
+
 case "${1:-all}" in
   setup) step_setup ;;
   baseline) step_baseline ;;
@@ -133,9 +186,10 @@ case "${1:-all}" in
   backpressure) step_backpressure ;;
   recovery) step_recovery ;;
   kill-restart) step_kill_restart ;;
+  slot-alarm) step_slot_alarm ;;
   all)
     rc=0
-    for s in setup baseline downtime negative-control backpressure recovery kill-restart; do
+    for s in setup baseline downtime negative-control backpressure recovery kill-restart slot-alarm; do
       printf '\n=== %s ===\n' "$s"
       "$0" "$s" || { rc=1; break; }
     done
