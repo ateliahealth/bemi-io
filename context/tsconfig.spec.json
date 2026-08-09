@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    // Type-checks the specs and the vitest config, which sit outside the src
+    // rootDir the build uses. Nothing is emitted, so rootDir is irrelevant here.
+    "rootDir": "."
+  },
+  "include": ["src", "vitest.config.mts"],
+  "exclude": ["node_modules"]
+}

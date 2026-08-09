@@ -6,7 +6,7 @@
 # CI reports them separately:
 #
 #   setup baseline downtime negative-control backpressure recovery kill-restart
-#   slot-alarm capture-filter
+#   slot-alarm capture-filter context-emit
 #
 # `all` runs them in order, which is what you want locally.
 #
@@ -230,6 +230,48 @@ step_capture_filter() {
   pass "excluded table silent while control captured, timestamp-only update dropped, real update kept"
 }
 
+step_context_emit() {
+  # Proves the contract the context emitter has to honour, using raw SQL rather
+  # than any client library: a transactional logical message with the agreed
+  # prefix, emitted in the same transaction as the writes, is stitched onto
+  # them - and a rollback discards both.
+  #
+  # The rollback half is the one that matters. It is exactly what breaks when
+  # context is emitted on a different connection from the writes: the write
+  # commits independently and survives an abort that should have undone it.
+  #
+  # Rollback runs first and commit second, so the commit doubles as the control.
+  # Asserting "the aborted row is absent" on its own would pass just as happily
+  # against a dead pipeline.
+  docker exec -i bemi-db-1 psql -U postgres -d appdb -q >/dev/null 2>&1 <<'SQL' || fail "could not run the context transactions"
+BEGIN;
+SELECT pg_logical_emit_message(true, '_bemi', '{"tenantId":"ctx-aborted"}');
+INSERT INTO todos (title) VALUES ('ctx-rollback');
+ROLLBACK;
+BEGIN;
+SELECT pg_logical_emit_message(true, '_bemi', '{"tenantId":"ctx-committed"}');
+INSERT INTO todos (title) VALUES ('ctx-commit');
+COMMIT;
+SQL
+
+  local target
+  target=$(( $(count) + 1 ))
+  wait_count "$target" 40 || fail "the committed write never landed; the pipeline is not capturing"
+
+  # Give the aborted transaction the same opportunity to appear as the
+  # committed one had, so its absence means something.
+  sleep 5
+
+  local committed_context aborted_rows
+  committed_context=$($PSQL_AUD "select context->>'tenantId' from changes where after->>'title'='ctx-commit';" | tr -d '[:space:]')
+  [ "$committed_context" = "ctx-committed" ] || fail "committed change carried context '$committed_context', expected 'ctx-committed'"
+
+  aborted_rows=$($PSQL_AUD "select count(*) from changes where after->>'title'='ctx-rollback' or context->>'tenantId'='ctx-aborted';" | tr -d '[:space:]')
+  [ "$aborted_rows" = 0 ] || fail "$aborted_rows record(s) survived a rolled back transaction"
+
+  pass "context stitched onto the committed change, and the aborted transaction left nothing behind"
+}
+
 case "${1:-all}" in
   setup) step_setup ;;
   baseline) step_baseline ;;
@@ -240,9 +282,10 @@ case "${1:-all}" in
   kill-restart) step_kill_restart ;;
   slot-alarm) step_slot_alarm ;;
   capture-filter) step_capture_filter ;;
+  context-emit) step_context_emit ;;
   all)
     rc=0
-    for s in setup baseline downtime negative-control backpressure recovery kill-restart slot-alarm capture-filter; do
+    for s in setup baseline downtime negative-control backpressure recovery kill-restart slot-alarm capture-filter context-emit; do
       printf '\n=== %s ===\n' "$s"
       "$0" "$s" || { rc=1; break; }
     done

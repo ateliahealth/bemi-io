@@ -6,6 +6,7 @@
     "prepare": "husky || true",
     "license:add": "./scripts/license-notice.sh backfill",
     "license:check": "./scripts/license-notice.sh check",
+    "licence:boundary": "./scripts/licence-boundary.sh",
     "lint": "turbo run lint",
     "lint:fix": "turbo run lint -- --fix",
     "test": "turbo run test",
