@@ -2,14 +2,18 @@
   "compilerOptions": {
     "lib": ["esnext"],
     "target": "es2022",
-    // node16, not commonjs/node10: TS 7 removes node10 outright, not just
-    // deprecates it. Both packages are CommonJS (no "type": "module"), so
-    // node16 still emits CJS - it changes resolution, not the output format.
-    "module": "node16",
-    "moduleResolution": "node16",
+    // nodenext, not node16: MikroORM 7 is ESM and is consumed here from CJS
+    // through require(esm), which TypeScript only permits under node20,
+    // nodenext or bundler. node16 rejects it with TS1479. Both packages stay
+    // CommonJS - this changes resolution, not the emitted module format.
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
     "esModuleInterop": true,
     "strict": true,
     "skipLibCheck": true,
+    // Explicit because auto-discovery of @types stops finding node under
+    // nodenext resolution in this workspace; tsc suggests exactly this.
+    "types": ["node"],
     "sourceMap": true,
     "declaration": true,
     // MikroORM entities carry decorators and the ORM reads the emitted

@@ -49,7 +49,7 @@ const serveHealth = () => {
   const jetstreamManager = await jetstreamConnection.jetstreamManager()
 
   const orm = await MikroORM.init(mikroOrmConfig)
-  await orm.getMigrator().up()
+  await orm.migrator.up()
 
   await runIngestionLoop({
     orm,

@@ -39,8 +39,10 @@
   },
   "dependencies": {
     "@mikro-orm/core": "catalog:",
+    "@mikro-orm/decorators": "catalog:",
     "@mikro-orm/migrations": "catalog:",
     "@mikro-orm/postgresql": "catalog:",
-    "nats": "catalog:"
+    "nats": "catalog:",
+    "reflect-metadata": "^0.2.2"
   }
 }

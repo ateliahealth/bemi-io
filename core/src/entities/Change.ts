@@ -1,6 +1,7 @@
 // Part of a fork of Bemi (https://github.com/BemiHQ/bemi-io),
 // modified by Atelia Health, 2026. Licensed under SSPL-1.0; see LICENSE.
-import { Entity, Property, Index, Unique, Enum, JsonType } from '@mikro-orm/postgresql'
+import { Entity, Property, Index, Unique, Enum } from '@mikro-orm/decorators/legacy'
+import { JsonType } from '@mikro-orm/postgresql'
 
 import { BaseEntity } from './BaseEntity'
 

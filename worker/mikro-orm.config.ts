@@ -2,6 +2,7 @@
 // modified by Atelia Health, 2026. Licensed under SSPL-1.0; see LICENSE.
 import { Options, PostgreSqlDriver } from '@mikro-orm/postgresql'
 import { Migrator } from '@mikro-orm/migrations'
+import { ReflectMetadataProvider } from '@mikro-orm/decorators/legacy'
 import { SqlHighlighter } from '@mikro-orm/sql-highlighter'
 
 import { BaseEntity, Change, MIGRATIONS_PATH } from '@bemi-db/core'
@@ -14,6 +15,8 @@ const DB_PASSWORD = process.env.DESTINATION_DB_PASSWORD || process.env.DB_PASSWO
 
 const mikroOrmConfig: Options = {
   driver: PostgreSqlDriver,
+  // No longer the default in v7; legacy decorators need it named explicitly.
+  metadataProvider: ReflectMetadataProvider,
   host: DB_HOST,
   port: DB_PORT,
   dbName: DB_NAME,
