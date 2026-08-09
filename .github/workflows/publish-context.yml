@@ -1,0 +1,120 @@
+# Part of a fork of Bemi (https://github.com/BemiHQ/bemi-io),
+# modified by Atelia Health, 2026. Licensed under SSPL-1.0; see LICENSE.
+#
+# Publishes context/ to npm. That package is MIT and independent of the rest of
+# this repository, which is SSPL-1.0 - see context/LICENSE.
+name: Publish pg-change-context
+
+on:
+  push:
+    # A namespace of its own. `bemi-v*` tags select what the deployment
+    # pipeline builds; a shared pattern would make a release of one look like a
+    # release of the other, and the two version independently.
+    tags: ['pg-change-context-v*']
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    permissions:
+      contents: read
+      # Required for provenance. Without it the publish still succeeds but the
+      # package ships unattested, which is worse than failing: nobody notices.
+      id-token: write
+    steps:
+      # Pinned to commit SHAs rather than moving tags. This job holds an npm
+      # token and an OIDC identity, so anything that runs before `npm publish`
+      # can publish under our name. A major-version tag is mutable - retargeting
+      # it upstream would run replacement code here with those credentials, and
+      # nothing in this repository would have changed.
+      #
+      # Pinned here rather than repository-wide because the exposure differs in
+      # kind: the other workflows can leak a Turbo cache token, this one can
+      # publish a package under our name to a registry other people install
+      # from. Extending it is worthwhile, but it is a separate change with its
+      # own maintenance cost.
+      #
+      # .github/dependabot.yml is what keeps these current. A pinned SHA stops
+      # receiving upstream fixes, and one never updated eventually breaks on a
+      # runtime deprecation - at publish time, which is the worst moment to
+      # find out. The pin and that file are one control; dropping either leaves
+      # this worse off than leaving both out.
+      - name: Check out code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Install Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+        name: Install pnpm
+        with:
+          run_install: false
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # A tag that disagrees with the manifest publishes a version nobody asked
+      # for, under a git ref that does not describe it. Cheap to check, and
+      # impossible to unpick afterwards since npm versions are immutable.
+      - name: Tag must match the package version
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#pg-change-context-v}"
+          PKG_VERSION="$(node -p "require('./context/package.json').version")"
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "tag $GITHUB_REF_NAME implies $TAG_VERSION, package.json says $PKG_VERSION" >&2
+            exit 1
+          fi
+          echo "Publishing @atelia/pg-change-context@$PKG_VERSION"
+
+      # The whole gate, not just this package's tests. Publishing is public and
+      # irreversible, so it is the last place to skip checks for speed.
+      - name: Run typescript
+        run: pnpm run typecheck
+
+      - name: Run tests
+        run: pnpm run test
+
+      - name: Run oxlint
+        run: pnpm run lint
+
+      - name: Check formatting
+        run: pnpm run format:check
+
+      # The most important check here. Every other consequence of a broken
+      # licence boundary is local and fixable; this one puts SSPL-derived code
+      # on a public registry under an MIT licence, in a tarball that cannot be
+      # unpublished after 72 hours and that other people will have installed.
+      - name: Check the MIT/SSPL boundary
+        run: ./scripts/licence-boundary.sh
+
+      - name: Build
+        run: pnpm --filter @atelia/pg-change-context run build
+
+      # Guards against the artifact silently losing its licence or its build.
+      # `files` is easy to break and the failure is invisible until someone
+      # installs the result.
+      - name: Verify the tarball contents
+        working-directory: context
+        run: |
+          npm pack --dry-run --json > /tmp/pack.json
+          FILES="$(node -p "require('/tmp/pack.json')[0].files.map(f => f.path).join('\n')")"
+          echo "$FILES"
+          for required in LICENSE README.md dist/index.js dist/index.d.ts; do
+            echo "$FILES" | grep -qxF "$required" || { echo "missing from tarball: $required" >&2; exit 1; }
+          done
+          echo "$FILES" | grep -qE '^src/' && { echo "source leaked into the tarball" >&2; exit 1; }
+          exit 0
+
+      - name: Publish
+        working-directory: context
+        # access and provenance come from publishConfig in the manifest, so the
+        # same settings apply to a local publish rather than living only here.
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

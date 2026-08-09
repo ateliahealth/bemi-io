@@ -2,6 +2,23 @@
   "name": "@atelia/pg-change-context",
   "version": "0.1.0",
   "description": "Emit application context alongside PostgreSQL data changes for logical-decoding CDC",
+  "keywords": [
+    "postgresql",
+    "cdc",
+    "change-data-capture",
+    "logical-decoding",
+    "audit",
+    "prisma"
+  ],
+  "homepage": "https://github.com/ateliahealth/bemi-io/tree/main/context#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ateliahealth/bemi-io.git",
+    "directory": "context"
+  },
+  "bugs": {
+    "url": "https://github.com/ateliahealth/bemi-io/issues"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -24,9 +41,16 @@
     "lint": "oxlint src"
   },
   "license": "MIT",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "devDependencies": {
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "^4.1.10"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
