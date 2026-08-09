@@ -92,6 +92,9 @@ jobs:
       - name: Each service recovers from a kill
         run: ./scripts/compose-gate.sh kill-restart
 
+      - name: An abandoned replication slot is reported
+        run: ./scripts/compose-gate.sh slot-alarm
+
       - name: Service logs on failure
         if: failure()
         run: docker compose logs --tail 200

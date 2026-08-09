@@ -4,14 +4,14 @@ name: bemi
 
 x-source-env: &source-env
   DB_HOST: db
-  DB_PORT: "5432"
+  DB_PORT: '5432'
   DB_NAME: appdb
   DB_USER: postgres
   DB_PASSWORD: postgres
 
 x-destination-env: &destination-env
   DESTINATION_DB_HOST: db
-  DESTINATION_DB_PORT: "5432"
+  DESTINATION_DB_PORT: '5432'
   DESTINATION_DB_NAME: audit
   DESTINATION_DB_USER: postgres
   DESTINATION_DB_PASSWORD: postgres
@@ -37,12 +37,12 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: appdb
     ports:
-      - "127.0.0.1:55432:5432"
+      - '127.0.0.1:55432:5432'
     volumes:
       - db-data:/var/lib/postgresql/data
       - ./compose/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d appdb"]
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d appdb']
       interval: 2s
       timeout: 3s
       retries: 30
@@ -50,23 +50,23 @@ services:
   nats:
     image: nats:2.14-alpine
     restart: unless-stopped
-    command: ["-js", "-sd", "/nats-store", "-m", "8222"]
+    command: ['-js', '-sd', '/nats-store', '-m', '8222']
     volumes:
       - nats-store:/nats-store
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8222/healthz || exit 1"]
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:8222/healthz || exit 1']
       interval: 2s
       timeout: 3s
       retries: 30
 
   stream-setup:
     <<: *worker-image
-    command: ["node", "dist/src/reset.js"]
+    command: ['node', 'dist/src/reset.js']
     environment:
       <<: [*source-env, *destination-env]
       NATS_URL: nats://nats:4222
-      BEMI_RESET_SLOT: "${BEMI_RESET_SLOT:-false}"
-      BEMI_STREAM_MAX_BYTES: "${BEMI_STREAM_MAX_BYTES:-}"
+      BEMI_RESET_SLOT: '${BEMI_RESET_SLOT:-false}'
+      BEMI_STREAM_MAX_BYTES: '${BEMI_STREAM_MAX_BYTES:-}'
     depends_on:
       db: { condition: service_healthy }
       nats: { condition: service_healthy }
@@ -80,18 +80,30 @@ services:
     environment:
       <<: *source-env
       NATS_URL: nats://nats:4222
-      BEMI_RESET_SLOT: "${BEMI_RESET_SLOT:-false}"
+      BEMI_RESET_SLOT: '${BEMI_RESET_SLOT:-false}'
     depends_on:
       stream-setup: { condition: service_completed_successfully }
 
   worker:
     <<: *worker-image
     restart: unless-stopped
-    command: ["node", "dist/src/index.js"]
+    command: ['node', 'dist/src/index.js']
     environment:
       <<: *destination-env
       NATS_URL: nats://nats:4222
-      MIKRO_ORM_DEBUG: "${MIKRO_ORM_DEBUG:-false}"
+      MIKRO_ORM_DEBUG: '${MIKRO_ORM_DEBUG:-false}'
+      # Seconds rather than the 1-minute default so the gate can observe a
+      # poll without sleeping through one. Both databases are on the same
+      # server here, which is what lets the destination connection see the
+      # source's slots at all.
+      BEMI_SLOT_POLL_INTERVAL_MS: '5000'
+      # Low enough that the gate's few MB of WAL crosses it. The shipped
+      # default is 10 GiB; nothing in this stack would ever reach that.
+      BEMI_SLOT_RETENTION_WARN_BYTES: '${BEMI_SLOT_RETENTION_WARN_BYTES:-1048576}'
+      # The shipped default is 15 minutes, which exists so a consumer restart
+      # does not page. Compressed here to keep the gate short; the gate scopes
+      # its log search to its own step so earlier restarts still do not count.
+      BEMI_SLOT_INACTIVE_GRACE_MS: '10000'
     depends_on:
       stream-setup: { condition: service_completed_successfully }
 

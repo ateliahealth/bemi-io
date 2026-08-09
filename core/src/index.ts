@@ -8,6 +8,15 @@ import 'reflect-metadata'
 
 export { connectJetstream, ensureDebeziumStream, buildConsumer, decodeData, encodeData } from './nats'
 export { runIngestionLoop } from './ingestion'
+export {
+  readReplicationSlots,
+  observeSlots,
+  logSlotWarnings,
+  SLOT_WARNING_MARKER,
+  type ReplicationSlotState,
+  type SlotWarning,
+  type SlotMonitorState,
+} from './replication-slot'
 export { logger } from './logger'
 export { BaseEntity } from './entities/BaseEntity'
 export { Change, Operation } from './entities/Change'
