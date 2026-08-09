@@ -57,7 +57,15 @@ export const stitchFetchedRecords = ({
         // savable, so it can be released; a context with no change is not, and
         // dropping it here means a later ack purges it and the change is saved
         // with no application context. Buffer it instead.
-        if (useBuffer && sameTransactionIdFetchedRecords.length === 1) {
+        //
+        // Keyed on whether the change has arrived, not on this being the only
+        // record. A transaction can legitimately carry more than one context -
+        // during a migration between emitters, both paths emit - and counting
+        // records treated that as "already paired", so both were dropped and
+        // the change was saved bare. One context survived a batch split; two
+        // did not.
+        const changeArrived = sameTransactionIdFetchedRecords.some((r) => r.isChange())
+        if (useBuffer && !changeArrived) {
           newFetchedRecordBuffer = newFetchedRecordBuffer.addFetchedRecord(fetchedRecord)
         }
         return
