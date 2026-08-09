@@ -297,8 +297,12 @@ SQL
 step_client_contract() {
   # 0.1.0 shipped broken because nothing called the package through the driver
   # its consumers use - psql handles pg_lsn, Prisma does not.
+  # Output is not discarded: this runs on the host, so `docker compose logs`
+  # cannot recover it and the failure message alone says nothing useful.
+  pnpm --filter @atelia/pg-change-context run prisma:generate \
+    || fail "could not generate the Prisma client"
   DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:55432/appdb" \
-    pnpm --filter @atelia/pg-change-context run test:integration >/dev/null 2>&1 \
+    pnpm --filter @atelia/pg-change-context run test:integration \
     || fail "the package does not work through a Prisma client"
   pass "package emits successfully through a real Prisma client"
 }

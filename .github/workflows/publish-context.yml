@@ -28,9 +28,8 @@ jobs:
       # publish rights.
       id-token: write
     steps:
-      # SHA-pinned: a retargeted upstream tag would run arbitrary code in the
-      # job that can publish under our name. .github/dependabot.yml keeps them
-      # current - a pin nobody updates eventually breaks at publish time.
+      # SHA-pinned like the other workflows; .github/dependabot.yml keeps them
+      # current. Highest stakes here: this job can publish under our name.
       - name: Check out code
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 

@@ -12,6 +12,13 @@
       "dependsOn": ["^build"]
     },
     "lint": {},
-    "format:check": {}
+    "format:check": {},
+    "prisma:generate": {
+      "cache": false,
+      "outputs": []
+    },
+    "@atelia/pg-change-context#typecheck": {
+      "dependsOn": ["^build", "@atelia/pg-change-context#prisma:generate"]
+    }
   }
 }
