@@ -38,7 +38,8 @@
     "lint": "oxlint src",
     "prisma:generate": "prisma generate",
     "test": "vitest run",
-    "test:integration": "vitest run --config vitest.integration.config.mts",
+    "test:integration": "vitest run --config vitest.integration.config.mts src/specs/prisma.int.spec.ts",
+    "test:pairing": "vitest run --config vitest.integration.config.mts src/specs/pairing.int.spec.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit -p tsconfig.spec.json"
   },

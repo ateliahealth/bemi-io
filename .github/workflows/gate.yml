@@ -93,6 +93,9 @@ jobs:
       - name: The package works through a Prisma client
         run: ./scripts/compose-gate.sh client-contract
 
+      - name: A context emitted by a client pairs with its changes
+        run: ./scripts/compose-gate.sh context-pairing
+
       - name: Service logs on failure
         if: failure()
         run: docker compose logs --tail 200
