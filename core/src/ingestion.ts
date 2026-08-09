@@ -8,6 +8,7 @@ import { Change } from './entities/Change'
 import { FetchedRecord } from './fetched-record'
 import { FetchedRecordBuffer } from './fetched-record-buffer'
 import { stitchFetchedRecords } from './stitching'
+import { filterEmptyChanges } from './capture-filter'
 import { createHash } from 'crypto'
 
 const INSERT_INTERVAL_MS = 1000 // 1 second to avoid overwhelming the database
@@ -75,6 +76,7 @@ export const runIngestionLoop = async ({
   fetchBatchSize = 100,
   insertBatchSize = 100,
   useBuffer = false,
+  ignoreFields = [],
   changeAttributesOverride = (changeAttributes: RequiredEntityData<Change>) => changeAttributes,
   onTick = () => {},
   onAcked,
@@ -84,6 +86,7 @@ export const runIngestionLoop = async ({
   fetchBatchSize?: number
   insertBatchSize?: number
   useBuffer?: boolean
+  ignoreFields?: string[]
   changeAttributesOverride?: (changeAttributes: RequiredEntityData<Change>) => RequiredEntityData<Change>
   onTick?: () => void
   onAcked?: (ackedStreamSequence: number) => Promise<void>
@@ -126,10 +129,21 @@ export const runIngestionLoop = async ({
     })
     fetchedRecordBuffer = newFetchedRecordBuffer
 
+    // Applied after stitching and before persisting, which is the only seam
+    // where it is safe. `ackStreamSequence` is decided by stitching from what
+    // arrived, not from what is stored, so dropping records here cannot strand
+    // the ack or leave the stream unpurgeable. Filtering earlier would remove
+    // context records that a later change still needs to pair with.
+    const { keptFetchedRecords, skippedCount } = filterEmptyChanges({
+      fetchedRecords: stitchedFetchedRecords,
+      ignoreFields,
+    })
+
     logger.info(
       [
         `Fetched: ${natsMessages.length}`,
-        `Saving: ${stitchedFetchedRecords.length}`,
+        `Saving: ${keptFetchedRecords.length}`,
+        ...(skippedCount ? [`Skipped (no change outside ignored fields): ${skippedCount}`] : []),
         `Pending in buffer: ${fetchedRecordBuffer.size()}`,
         `Pending in stream: ${pendingMessageCount}`,
         `Ack sequence: ${ackStreamSequence ? `#${ackStreamSequence}` : 'none'}`,
@@ -138,9 +152,9 @@ export const runIngestionLoop = async ({
     )
 
     // Persisting and acking
-    if (stitchedFetchedRecords.length) {
+    if (keptFetchedRecords.length) {
       try {
-        await persistFetchedRecords({ orm, fetchedRecords: stitchedFetchedRecords, insertBatchSize })
+        await persistFetchedRecords({ orm, fetchedRecords: keptFetchedRecords, insertBatchSize })
       } catch (e) {
         logger.info(`Error while saving: ${e}`)
         throw e
@@ -172,7 +186,7 @@ export const runIngestionLoop = async ({
       }
     }
 
-    if (stitchedFetchedRecords.length) {
+    if (keptFetchedRecords.length) {
       logger.debug('Sleeping...')
       await sleep(INSERT_INTERVAL_MS)
     }

@@ -34,6 +34,7 @@ Bemi automatically tracks database changes ensuring 100% reliability and a compr
   - [Running with Devbox](#running-with-devbox)
   - [Running natively](#running-natively)
 - [Contextualizing data changes](#contextualizing-data-changes)
+- [Limiting what is captured](#limiting-what-is-captured)
 - [Architecture](#architecture)
 - [Testing](#testing)
 - [License](#license)
@@ -142,7 +143,6 @@ make worker-setup && cd worker && npm install
 
 Set environment variables specifying connection settings for a PostgreSQL database you want to track run a worker as a single process with directly installed Node.js:
 
-
 ```sh
 export DB_HOST=127.0.0.1 DB_PORT=5432 DB_NAME=postgres DB_USER=postgres DB_PASSWORD=postgres
 npm concurrently -- "npm:up:*"
@@ -159,6 +159,36 @@ This will add a new record in the `changes` table within the same database after
 ## Contextualizing data changes
 
 Optionally, to automatically enhance these low-level database changes with application-specific context (e.g., user ID, API endpoint, etc.), check out our compatible [ORM packages](https://docs.bemi.io/#supported-orms).
+
+## Limiting what is captured
+
+Three environment variables narrow what reaches the `changes` table. All are
+empty by default: with none of them set, everything is captured.
+
+| Variable               | Applies to | Effect                                                                                                                                                       |
+| ---------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `BEMI_EXCLUDE_TABLES`  | Debezium   | Comma-separated `schema.table` entries that are never captured. Appended to the built-in exclusion of the `changes` table itself.                            |
+| `BEMI_EXCLUDE_COLUMNS` | Debezium   | Comma-separated `schema.table.column` entries, regex accepted, removed from before and after images. Use this to keep a value out of the audit log entirely. |
+| `BEMI_IGNORE_FIELDS`   | Worker     | Comma-separated field names whose change alone does not justify a record. An update that touched nothing else is dropped.                                    |
+
+`BEMI_EXCLUDE_COLUMNS` and `BEMI_IGNORE_FIELDS` are easy to confuse and do
+different things. Excluding a column removes it everywhere, including from
+changes worth keeping. Ignoring a field keeps the column in the record and only
+suppresses updates that touched nothing but that field — the case where an ORM
+bumps a timestamp on a write that changed no data.
+
+Excluding a table or column costs nothing downstream because the change is never
+emitted. Ignoring a field is decided in the worker, so the change is still
+decoded and delivered.
+
+An update with no before image is never dropped by `BEMI_IGNORE_FIELDS`: without
+`REPLICA IDENTITY FULL` there is nothing to compare, and the change may be
+substantive. Creates and deletes are never dropped either.
+
+Each of these silently records less than before when misconfigured, which is
+hard to notice afterwards. The resolved table and column exclusions are logged
+by the Debezium container at startup, the worker logs the fields it is ignoring,
+and the number of records suppressed appears in each batch's log line.
 
 ## Architecture
 

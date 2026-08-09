@@ -6,7 +6,7 @@
 # CI reports them separately:
 #
 #   setup baseline downtime negative-control backpressure recovery kill-restart
-#   slot-alarm
+#   slot-alarm capture-filter
 #
 # `all` runs them in order, which is what you want locally.
 #
@@ -187,6 +187,49 @@ step_slot_alarm() {
   pass "abandoned slot reported in $hits log lines, no false positive on the live slot, /healthz agrees ($reported)"
 }
 
+step_capture_filter() {
+  # Both knobs remove audit data when misconfigured, and a wrong one produces a
+  # pipeline that runs perfectly while capturing less than intended. So each
+  # assertion is paired with a control proving the pipeline still captures what
+  # was not excluded - without that, "no rows appeared" passes just as happily
+  # when the exclusion matched everything.
+  $PSQL_APP "CREATE TABLE IF NOT EXISTS capture_excluded (id serial PRIMARY KEY, note text);" >/dev/null 2>&1 \
+    || fail "could not create the excluded table"
+
+  BEMI_EXCLUDE_TABLES=public.capture_excluded BEMI_IGNORE_FIELDS=updated_at \
+    docker compose up -d --force-recreate debezium worker >/dev/null 2>&1 \
+    || fail "could not restart with capture filtering enabled"
+  wait_slot || fail "Debezium never reactivated the slot after reconfiguring"
+
+  local base excluded_before
+  excluded_before=$($PSQL_AUD "select count(*) from changes where \"table\"='capture_excluded';" | tr -d '[:space:]')
+  base=$(count)
+
+  # Excluded table plus control, written together so one wait covers both and
+  # the control proves the pipeline was alive for the excluded write too.
+  sql "INSERT INTO capture_excluded (note) VALUES ('should-not-appear');"
+  sql "INSERT INTO todos (title) VALUES ('capture-control');"
+  wait_count "$((base + 1))" 40 || fail "the control insert never landed; the exclusion broke capture entirely"
+
+  local excluded_after
+  excluded_after=$($PSQL_AUD "select count(*) from changes where \"table\"='capture_excluded';" | tr -d '[:space:]')
+  [ "$excluded_after" = "$excluded_before" ] || fail "excluded table produced $((excluded_after - excluded_before)) change(s)"
+
+  # Field filter. The timestamp-only update must vanish and the real one must
+  # not - checked in that order against the same row, so a filter that dropped
+  # everything would fail the second assertion.
+  local after_control
+  after_control=$(count)
+  sql "UPDATE todos SET updated_at = now() WHERE title='capture-control';"
+  sleep 8
+  [ "$(count)" = "$after_control" ] || fail "a timestamp-only update was recorded despite BEMI_IGNORE_FIELDS"
+
+  sql "UPDATE todos SET status='done' WHERE title='capture-control';"
+  wait_count "$((after_control + 1))" 40 || fail "a real update was dropped; the field filter is too broad"
+
+  pass "excluded table silent while control captured, timestamp-only update dropped, real update kept"
+}
+
 case "${1:-all}" in
   setup) step_setup ;;
   baseline) step_baseline ;;
@@ -196,9 +239,10 @@ case "${1:-all}" in
   recovery) step_recovery ;;
   kill-restart) step_kill_restart ;;
   slot-alarm) step_slot_alarm ;;
+  capture-filter) step_capture_filter ;;
   all)
     rc=0
-    for s in setup baseline downtime negative-control backpressure recovery kill-restart slot-alarm; do
+    for s in setup baseline downtime negative-control backpressure recovery kill-restart slot-alarm capture-filter; do
       printf '\n=== %s ===\n' "$s"
       "$0" "$s" || { rc=1; break; }
     done
