@@ -137,6 +137,42 @@ Two guards worth knowing about, because both failures are silent otherwise:
 Provenance is attested — `publishConfig` sets it, so a local publish behaves
 the same way as CI rather than the guarantee living only in the workflow.
 
+### Authentication: trusted publishing, no token
+
+CI authenticates by exchanging the workflow's short-lived OIDC identity for
+publish rights. There is no npm token in this repository and no secret to
+leak, rotate, or forget.
+
+npm grants those rights because the package's **trusted publisher** on
+npmjs.com names this repository and this workflow file. Two consequences worth
+knowing before someone trips over them:
+
+- **Renaming or moving `publish-context.yml` revokes publishing.** That is the
+  mechanism working, not a fault. Update the trusted publisher first.
+- **`NODE_AUTH_TOKEN` is deliberately never set.** npm prefers a token when one
+  is present, so configuring one would silently keep using the credential this
+  is meant to retire — and the publish would keep working, which is why nobody
+  would notice.
+
+#### First-time setup
+
+Trusted publishing is configured per package, so it needs somewhere to attach.
+Check npmjs.com first — if a trusted publisher can be configured for a package
+that does not exist yet, skip straight to step 3.
+
+1. Own the `@atelia` scope on npmjs.com.
+2. Publish `0.0.1` once from a laptop, interactively, so the package exists.
+3. On npmjs.com → the package → configure a trusted publisher: this repository,
+   workflow `publish-context.yml`.
+4. Revoke the token from step 2 if one was created. From then on every release
+   is a tag.
+
+If a token is ever used for a CI publish instead, it must have **"Bypass
+two-factor authentication" enabled** — CI cannot answer an OTP prompt and the
+publish fails with `EOTP`, which is a confusing error at the worst moment. A
+token made for a laptop publish will have that off, correctly, and will not
+work here.
+
 ## Licence
 
 MIT — see `LICENSE` in this directory.

@@ -21,13 +21,16 @@ jobs:
     runs-on: blacksmith-2vcpu-ubuntu-2404
     permissions:
       contents: read
-      # Required for provenance. Without it the publish still succeeds but the
-      # package ships unattested, which is worse than failing: nobody notices.
+      # Not optional here. This is the credential: npm trusted publishing
+      # exchanges this short-lived OIDC token for publish rights, so without it
+      # there is nothing to authenticate with at all. It also carries the
+      # provenance attestation.
       id-token: write
     steps:
-      # Pinned to commit SHAs rather than moving tags. This job holds an npm
-      # token and an OIDC identity, so anything that runs before `npm publish`
-      # can publish under our name. A major-version tag is mutable - retargeting
+      # Pinned to commit SHAs rather than moving tags. This job can publish
+      # under our name, so anything that runs before `npm publish` can too -
+      # trusted publishing removes the stored token, not the ability to publish
+      # from inside this job. A major-version tag is mutable - retargeting
       # it upstream would run replacement code here with those credentials, and
       # nothing in this repository would have changed.
       #
@@ -111,10 +114,31 @@ jobs:
           echo "$FILES" | grep -qE '^src/' && { echo "source leaked into the tarball" >&2; exit 1; }
           exit 0
 
+      # Checked rather than installed. Upgrading npm here would mean running
+      # an unpinned package in the job that can publish under our name, which
+      # is the thing the SHA pins above exist to prevent.
+      - name: npm must support trusted publishing
+        run: |
+          NPM_VERSION="$(npm --version)"
+          echo "npm $NPM_VERSION"
+          MAJOR="${NPM_VERSION%%.*}"
+          if [ "$MAJOR" -lt 11 ]; then
+            echo "npm $NPM_VERSION cannot authenticate via OIDC; needs 11.5.1 or newer" >&2
+            exit 1
+          fi
+
       - name: Publish
         working-directory: context
-        # access and provenance come from publishConfig in the manifest, so the
-        # same settings apply to a local publish rather than living only here.
+        # No token. npm exchanges the job's OIDC identity for short-lived
+        # publish rights, granted because the trusted publisher configured for
+        # this package on npmjs.com names this repository and this workflow
+        # file. Renaming or moving this file revokes that, which is the
+        # mechanism working rather than a bug.
+        #
+        # NODE_AUTH_TOKEN is deliberately unset: npm prefers a token when one
+        # is present, so leaving it configured would silently keep using the
+        # credential this is meant to retire.
+        #
+        # access and provenance come from publishConfig in the manifest, so a
+        # local publish behaves the same rather than the guarantee living here.
         run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
