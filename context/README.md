@@ -99,6 +99,38 @@ The limit defaults to 8 KiB and is per-call configurable. It is generous
 relative to real payloads; exceeding it usually means something unintended is
 being attached.
 
+## Releasing
+
+Publishing is driven by a tag in its own namespace, so it never collides with
+the `bemi-v*` tags that select what the deployment pipeline builds — the two
+version independently and a shared pattern would make a release of one look
+like a release of the other.
+
+```sh
+# bump "version" in context/package.json, commit, then:
+git tag pg-change-context-v0.2.0
+git push origin pg-change-context-v0.2.0
+```
+
+`.github/workflows/publish-context.yml` then runs the whole repository gate —
+typecheck, tests, lint, formatting and the licence boundary — before it
+publishes. Publishing is public and effectively irreversible, so it is the last
+place to trade checks for speed. The boundary check matters most here: every
+other consequence of breaking it is local, while this one would put
+SSPL-derived code on a public registry under an MIT licence.
+
+Two guards worth knowing about, because both failures are silent otherwise:
+
+- **The tag must match the manifest version.** A mismatch publishes a version
+  nobody asked for under a ref that does not describe it, and npm versions are
+  immutable.
+- **The tarball is inspected before publishing.** `LICENSE`, `README.md` and
+  the built output must be present and `src/` must not be. The `files` field is
+  easy to break and the damage is invisible until someone installs the result.
+
+Provenance is attested — `publishConfig` sets it, so a local publish behaves
+the same way as CI rather than the guarantee living only in the workflow.
+
 ## Licence
 
 MIT — see `LICENSE` in this directory.
