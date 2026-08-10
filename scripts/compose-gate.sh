@@ -6,7 +6,7 @@
 # CI reports them separately:
 #
 #   setup baseline downtime negative-control backpressure recovery kill-restart
-#   slot-alarm capture-filter context-emit client-contract
+#   slot-alarm capture-filter context-emit client-contract context-pairing
 #
 # `all` runs them in order, which is what you want locally.
 #
@@ -307,6 +307,49 @@ step_client_contract() {
   pass "package emits successfully through a real Prisma client"
 }
 
+step_context_pairing() {
+  # The seam a consumer cannot test: an emit that looks right at the call site
+  # but pairs with nothing downstream. Driven through the published emitter and
+  # a real Prisma client, then asserted here, because only the gate can see
+  # both the source and the audit database.
+  pnpm --filter @atelia/pg-change-context run prisma:generate >/dev/null 2>&1 \
+    || fail "could not generate the Prisma client"
+  DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:55432/appdb" \
+    pnpm --filter @atelia/pg-change-context run test:pairing \
+    || fail "the pairing writes did not complete"
+
+  # Both writes of the transaction, so one context covering several changes is
+  # asserted rather than assumed.
+  local tx_contexts
+  for _ in $(seq 1 40); do
+    tx_contexts=$($PSQL_AUD "select string_agg(distinct context->>'tenantId', ',') from changes where after->>'title' in ('pair-tx-a','pair-tx-b');" | tr -d '[:space:]')
+    [ "$tx_contexts" = "pair-tx" ] && break
+    sleep 2
+  done
+  [ "$tx_contexts" = "pair-tx" ] || fail "transactional writes carried context '$tx_contexts', expected 'pair-tx'"
+
+  local tx_rows
+  tx_rows=$($PSQL_AUD "select count(*) from changes where after->>'title' in ('pair-tx-a','pair-tx-b');" | tr -d '[:space:]')
+  [ "$tx_rows" = 2 ] || fail "expected 2 transactional changes, found $tx_rows"
+
+  # The wrapped lone write - the path worth a third of tenant attribution.
+  local lone
+  for _ in $(seq 1 40); do
+    lone=$($PSQL_AUD "select context->>'tenantId' || '/' || (context->>'requestId') from changes where after->>'title'='pair-lone';" | tr -d '[:space:]')
+    [ "$lone" = "pair-lone/request-pair-lone" ] && break
+    sleep 2
+  done
+  [ "$lone" = "pair-lone/request-pair-lone" ] || fail "lone write carried '$lone'"
+
+  # Nothing from the aborted transaction, neither the change nor an orphan
+  # context attributed to a later one.
+  local aborted
+  aborted=$($PSQL_AUD "select count(*) from changes where after->>'title'='pair-rollback' or context->>'tenantId'='pair-rollback';" | tr -d '[:space:]')
+  [ "$aborted" = 0 ] || fail "$aborted record(s) survived the rolled back transaction"
+
+  pass "one context covered both writes, the wrapped lone write paired with both fields intact, the rollback left nothing"
+}
+
 case "${1:-all}" in
   setup) step_setup ;;
   baseline) step_baseline ;;
@@ -319,9 +362,10 @@ case "${1:-all}" in
   capture-filter) step_capture_filter ;;
   context-emit) step_context_emit ;;
   client-contract) step_client_contract ;;
+  context-pairing) step_context_pairing ;;
   all)
     rc=0
-    for s in setup baseline downtime negative-control backpressure recovery kill-restart slot-alarm capture-filter context-emit client-contract; do
+    for s in setup baseline downtime negative-control backpressure recovery kill-restart slot-alarm capture-filter context-emit client-contract context-pairing; do
       printf '\n=== %s ===\n' "$s"
       "$0" "$s" || { rc=1; break; }
     done
