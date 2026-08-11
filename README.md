@@ -51,9 +51,6 @@ maintained by Atelia Health for self-hosting. See [License](#license).
   ALTER TABLE [tracked_table_name] REPLICA IDENTITY FULL;
   ```
 
-Running the stack outside Docker additionally needs Node.js, Java, and a
-[NATS server](https://github.com/nats-io/nats-server).
-
 ## Quickstart
 
 `docker-compose.yml` stands up the whole pipeline — PostgreSQL, NATS, Debezium
