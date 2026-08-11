@@ -20,7 +20,6 @@ on:
       # against the live pipeline, and Build excludes integration specs, so
       # ignoring it would let an emitter regression merge untested.
       - '**/*.md'
-      - 'docs/**'
       - 'LICENSE'
   pull_request:
     paths-ignore:
@@ -28,7 +27,6 @@ on:
       # against the live pipeline, and Build excludes integration specs, so
       # ignoring it would let an emitter regression merge untested.
       - '**/*.md'
-      - 'docs/**'
       - 'LICENSE'
 
 permissions:

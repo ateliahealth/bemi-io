@@ -4,6 +4,5 @@
 worker/debezium-server
 .git
 .github
-docs
 compose
 docker-compose.yml

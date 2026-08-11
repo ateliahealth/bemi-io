@@ -192,11 +192,6 @@ package-lock.json
 pnpm-lock.yaml
 !/pnpm-lock.yaml
 
-# Production
-/docs/build
-# Generated files
-/docs/.cache-loader
-
 # Turborepo
 .turbo
 
