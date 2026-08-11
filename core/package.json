@@ -1,6 +1,7 @@
 {
   "name": "@bemi-db/core",
   "version": "0.1.0",
+  "private": true,
   "description": "Automatic data change tracking for PostgreSQL",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -24,14 +25,15 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/BemiHQ/bemi.git"
+    "url": "git+https://github.com/ateliahealth/bemi-io.git",
+    "directory": "core"
   },
   "author": "",
   "license": "SSPL-1.0",
   "bugs": {
-    "url": "https://github.com/BemiHQ/bemi-io/issues"
+    "url": "https://github.com/ateliahealth/bemi-io/issues"
   },
-  "homepage": "https://github.com/BemiHQ/bemi#readme",
+  "homepage": "https://github.com/ateliahealth/bemi-io#readme",
   "devDependencies": {
     "@types/node": "catalog:",
     "typescript": "catalog:",
