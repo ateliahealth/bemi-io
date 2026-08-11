@@ -26,8 +26,8 @@ prefix_for() {
   esac
 }
 
-# Tracked text files that can carry a comment. Lockfiles, JSON and the vendored
-# docs site are excluded: no comment syntax, or not ours to annotate.
+# Tracked text files that can carry a comment. Lockfiles and JSON are excluded:
+# no comment syntax to put a notice in.
 #
 # context/ is excluded because it is not a fork of anything. It is original
 # work under its own MIT licence, kept separate precisely so applications can
@@ -38,7 +38,7 @@ target_files() {
   git ls-files -- \
     '*.ts' '*.mts' '*.js' '*.mjs' '*.sh' '*.sql' '*.properties' '*.yml' '*.yaml' \
     '*Dockerfile' '.githooks/*' \
-    ':!:docs/**' ':!:**/dist/**' ':!:pnpm-lock.yaml' ':!:*/pnpm-lock.yaml' ':!:context/**'
+    ':!:**/dist/**' ':!:pnpm-lock.yaml' ':!:*/pnpm-lock.yaml' ':!:context/**'
 }
 
 # Only the top of the file counts. A bare substring search would match this
