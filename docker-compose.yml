@@ -77,6 +77,8 @@ services:
       context: .
       dockerfile: debezium/Dockerfile
     restart: unless-stopped
+    volumes:
+      - debezium-data:/debezium/data
     environment:
       <<: *source-env
       NATS_URL: nats://nats:4222
@@ -118,3 +120,4 @@ services:
 volumes:
   db-data:
   nats-store:
+  debezium-data:

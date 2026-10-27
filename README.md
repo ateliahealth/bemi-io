@@ -30,7 +30,12 @@ maintained by Atelia Health for self-hosting. See [License](#license).
 - No effect on application latency: decoding happens out of band, downstream of
   the commit.
 - Durability across restarts. The replication slot holds WAL while a consumer
-  is down, so writes made during an outage still land afterwards.
+  is down, so writes made during an outage still land afterwards. Debezium
+  keeps its offsets in `/debezium/data`; mount a volume there, or a container
+  restart partway through a large transaction replays it from the first row.
+  The image runs as uid 1000, so the volume must be writable by it: Docker
+  named volumes inherit that ownership, and on Kubernetes set `fsGroup: 1000`.
+  Debezium refuses to start if the directory is not writable.
 - Optional per-transaction application context (user, tenant, request) attached
   to the changes it caused.
 
@@ -169,6 +174,14 @@ Two further variables control the slot itself: `BEMI_SLOT_NAME` (default
 startup. Resetting discards every change that has not yet been consumed — the
 compose gate uses it as a negative control precisely because it loses data.
 
+The slot is dropped by the stream-setup container (`dist/src/reset.js`), and
+it must finish before Debezium starts. Debezium discards its stored offsets only
+when it finds the slot missing at startup. A drop that lands after that check
+leaves offsets from the old slot on the volume, and every later start finds the
+new slot and keeps them. Compose orders this with
+`service_completed_successfully`; on Kubernetes, run stream-setup as an init
+container of the same pod rather than as a separate Job.
+
 ## Architecture
 
 ```mermaid
@@ -233,9 +246,9 @@ is covered by a compose regression gate that drives the real stack:
 ```
 
 Each step is also runnable on its own (`setup`, `baseline`, `downtime`,
-`negative-control`, `backpressure`, `recovery`, `kill-restart`, `slot-alarm`,
-`capture-filter`, `context-emit`, `client-contract`, `context-pairing`); CI runs
-them as separate steps so a failure names itself.
+`negative-control`, `backpressure`, `recovery`, `offset-resume`, `kill-restart`,
+`slot-alarm`, `capture-filter`, `context-emit`, `client-contract`,
+`context-pairing`); CI runs them as separate steps so a failure names itself.
 
 ## License
 

@@ -17,15 +17,22 @@ RUN apt-get update && \
 # which a 17 JRE refuses to load.
 FROM eclipse-temurin:21-jre-jammy
 
+# debezium.sh checks the replication slot exists before trusting stored offsets.
+RUN apt-get update && \
+  apt-get install -y --no-install-recommends postgresql-client && \
+  rm -rf /var/lib/apt/lists/*
+
 WORKDIR /debezium
 
 COPY --from=fetch /debezium-server ./debezium-server
 COPY debezium/application.properties ./
 COPY debezium/debezium.sh ./
 
-# debezium.sh rewrites config/application.properties and the server persists
-# offsets.dat, both under /debezium, so the runtime user must own it.
-RUN useradd --create-home --uid 1000 debezium && chown -R debezium:debezium /debezium
+# debezium.sh rewrites config/application.properties under /debezium, so the
+# runtime user must own it. data/ holds the connector offsets and is meant to be
+# a mounted volume: on the container's own filesystem they are lost on every
+# restart, and Debezium then replays from the slot's last confirmed commit.
+RUN useradd --create-home --uid 1000 debezium && mkdir -p /debezium/data && chown -R debezium:debezium /debezium
 
 USER debezium
 

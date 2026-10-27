@@ -74,6 +74,9 @@ jobs:
       - name: Raising the cap replays every row exactly once
         run: ./scripts/compose-gate.sh recovery
 
+      - name: A replaced Debezium resumes inside a transaction
+        run: ./scripts/compose-gate.sh offset-resume
+
       - name: Each service recovers from a kill
         run: ./scripts/compose-gate.sh kill-restart
 
