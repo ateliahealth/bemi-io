@@ -5,8 +5,8 @@
 # Compose regression gate. Run from the repo root, one step per invocation so
 # CI reports them separately:
 #
-#   setup baseline downtime negative-control backpressure recovery kill-restart
-#   slot-alarm capture-filter context-emit client-contract context-pairing
+#   setup baseline downtime negative-control backpressure recovery offset-resume
+#   kill-restart slot-alarm capture-filter context-emit client-contract context-pairing
 #
 # `all` runs them in order, which is what you want locally.
 #
@@ -107,6 +107,52 @@ step_recovery() {
   dupes=$($PSQL_AUD "select count(*) from (select position,\"table\",schema,database,operation from changes group by 1,2,3,4,5 having count(*)>1) d;" | tr -d '[:space:]')
   [ "$dupes" = 0 ] || fail "$dupes duplicate key groups; the replay was not idempotent"
   pass "$(count) rows = $base + 6000, 0 duplicate groups"
+}
+
+stream_last_seq() {
+  docker exec bemi-nats-1 wget -qO- 'http://127.0.0.1:8222/jsz?streams=true' 2>/dev/null \
+    | grep -o '"last_seq": *[0-9]*' | head -1 | grep -o '[0-9]*$'
+}
+
+step_offset_resume() {
+  # A transaction larger than the stream blocks Debezium partway through it,
+  # and the slot cannot advance until its commit. If the container is then
+  # replaced - a fresh filesystem, as an orchestrator does on every restart -
+  # Debezium must resume from its stored offset inside the transaction. Without
+  # one it republishes from the first row, refills the stream with rows already
+  # persisted, and a large enough transaction never gets through at all.
+  # `docker compose restart` keeps the container filesystem, so it cannot show
+  # this; --force-recreate is what replaces it.
+  local base start published replayed missing rows=6000
+  docker compose stop worker >/dev/null 2>&1
+  BEMI_STREAM_MAX_BYTES=4194304 docker compose up -d --force-recreate stream-setup >/dev/null 2>&1
+  base=$(count)
+  start=$(stream_last_seq)
+  [ -n "$start" ] || fail "could not read the stream's last sequence"
+  local since
+  since=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  sql "INSERT INTO todos (title) SELECT 'or-'||g||repeat('x',500) FROM generate_series(1,$rows) g;"
+  local seen=no
+  for _ in $(seq 1 60); do
+    [ "$(docker compose logs --since "$since" debezium 2>&1 | grep -c 10077)" -gt 0 ] && { seen=yes; break; }
+    sleep 2
+  done
+  [ "$seen" = yes ] || fail "the transaction never filled the stream, so a restart inside it proves nothing"
+  # Long enough for an offset flush to cover what has been published so far.
+  sleep 15
+  published=$(( $(stream_last_seq) - start ))
+  docker compose up -d --force-recreate debezium >/dev/null 2>&1
+  docker compose up -d --force-recreate stream-setup >/dev/null 2>&1
+  docker compose up -d worker >/dev/null 2>&1
+  wait_count $((base + rows)) 150 || fail "only $(( $(count) - base ))/$rows rows landed after the restart"
+  missing=$(docker logs bemi-debezium-1 2>&1 | grep -c 'No previous offsets found' || true)
+  [ "$missing" = 0 ] || fail "the replaced container found no stored offsets"
+  # Heartbeats publish too, so allow for them; a replay adds roughly everything
+  # published before the restart, which is thousands, not tens.
+  replayed=$(( $(stream_last_seq) - start - rows ))
+  [ "$replayed" -lt $((published / 2)) ] \
+    || fail "republished $replayed rows after the restart, of $published published before it; Debezium restarted the transaction"
+  pass "$rows rows landed; $published published before the restart, $replayed extra messages after it"
 }
 
 step_kill_restart() {
@@ -357,6 +403,7 @@ case "${1:-all}" in
   negative-control) step_negative_control ;;
   backpressure) step_backpressure ;;
   recovery) step_recovery ;;
+  offset-resume) step_offset_resume ;;
   kill-restart) step_kill_restart ;;
   slot-alarm) step_slot_alarm ;;
   capture-filter) step_capture_filter ;;
@@ -365,7 +412,7 @@ case "${1:-all}" in
   context-pairing) step_context_pairing ;;
   all)
     rc=0
-    for s in setup baseline downtime negative-control backpressure recovery kill-restart slot-alarm capture-filter context-emit client-contract context-pairing; do
+    for s in setup baseline downtime negative-control backpressure recovery offset-resume kill-restart slot-alarm capture-filter context-emit client-contract context-pairing; do
       printf '\n=== %s ===\n' "$s"
       "$0" "$s" || { rc=1; break; }
     done

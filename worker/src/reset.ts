@@ -40,8 +40,8 @@ const connectOrm = async () => {
       .getConnection()
       .execute('SELECT pg_drop_replication_slot(slot_name) FROM pg_replication_slots WHERE slot_name = ?', [SLOT_NAME])
     await orm.close()
-    // Debezium's offsets.dat lives in the debezium container, not this one;
-    // debezium.sh removes it under the same flag before starting the server.
+    // Debezium's offsets.dat lives on the debezium container's volume, not
+    // this one; debezium.sh removes it under the same flag before starting.
     logger.info(`BEMI_RESET_SLOT=true - dropped replication slot "${SLOT_NAME}"`)
   } else {
     logger.info(`Preserving replication slot "${SLOT_NAME}" - Debezium resumes from its confirmed position`)

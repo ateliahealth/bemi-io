@@ -30,7 +30,9 @@ maintained by Atelia Health for self-hosting. See [License](#license).
 - No effect on application latency: decoding happens out of band, downstream of
   the commit.
 - Durability across restarts. The replication slot holds WAL while a consumer
-  is down, so writes made during an outage still land afterwards.
+  is down, so writes made during an outage still land afterwards. Debezium
+  keeps its offsets in `/debezium/data`; mount a volume there, or a container
+  restart partway through a large transaction replays it from the first row.
 - Optional per-transaction application context (user, tenant, request) attached
   to the changes it caused.
 
@@ -233,9 +235,9 @@ is covered by a compose regression gate that drives the real stack:
 ```
 
 Each step is also runnable on its own (`setup`, `baseline`, `downtime`,
-`negative-control`, `backpressure`, `recovery`, `kill-restart`, `slot-alarm`,
-`capture-filter`, `context-emit`, `client-contract`, `context-pairing`); CI runs
-them as separate steps so a failure names itself.
+`negative-control`, `backpressure`, `recovery`, `offset-resume`, `kill-restart`,
+`slot-alarm`, `capture-filter`, `context-emit`, `client-contract`,
+`context-pairing`); CI runs them as separate steps so a failure names itself.
 
 ## License
 

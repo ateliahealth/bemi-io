@@ -36,11 +36,13 @@ echo "Capture filter: tables excluded = ${TABLE_EXCLUDE_LIST}; columns excluded 
 # with no configuration at all rather than failing loudly.
 echo "${PROPERTIES}" > ./debezium-server/config/application.properties &&
 # reset.js drops the slot from another container; the connector offsets live
-# here, and resuming from them against a recreated slot fails. The marker
-# keeps this to once per container: stream-setup is one-shot, so on an
-# in-place restart the slot still exists and wiping offsets would replay it.
-if [ "${BEMI_RESET_SLOT}" = "true" ] && [ ! -f ./debezium-server/.reset-applied ]; then
-  rm -f ./debezium-server/offsets.dat && touch ./debezium-server/.reset-applied
+# here, and resuming from them against a recreated slot fails. The marker keeps
+# this to once per run of stream-setup, which is once per pod (or per compose
+# recreate), not per container: an in-place restart still has the slot, and
+# wiping offsets would replay it. HOSTNAME has that scope, and the marker sits
+# beside the offsets so it survives the same restarts they do.
+if [ "${BEMI_RESET_SLOT}" = "true" ] && [ "$(cat ./data/.reset-applied 2>/dev/null)" != "${HOSTNAME}" ]; then
+  rm -f ./data/offsets.dat && echo "${HOSTNAME}" > ./data/.reset-applied
 fi &&
 # exec so the JVM becomes PID 1 and receives SIGTERM directly. Left under bash,
 # the signal is not forwarded and the container is SIGKILLed after the grace
