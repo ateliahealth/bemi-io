@@ -143,7 +143,10 @@ step_offset_resume() {
   [ "$seen" = yes ] || fail "the transaction never filled the stream, so a restart inside it proves nothing"
   # Long enough for an offset flush to cover what has been published so far.
   sleep 15
-  published=$(( $(stream_last_seq) - start ))
+  local mid end
+  mid=$(stream_last_seq)
+  [ -n "$mid" ] || fail "could not read the stream's last sequence before the restart"
+  published=$((mid - start))
   docker compose up -d --force-recreate debezium >/dev/null 2>&1
   docker compose up -d --force-recreate stream-setup >/dev/null 2>&1
   docker compose up -d worker >/dev/null 2>&1
@@ -152,7 +155,9 @@ step_offset_resume() {
   [ "$missing" = 0 ] || fail "the replaced container found no stored offsets"
   # Heartbeats publish too, so allow for them; a replay adds roughly everything
   # published before the restart, which is thousands, not tens.
-  replayed=$(( $(stream_last_seq) - start - rows ))
+  end=$(stream_last_seq)
+  [ -n "$end" ] || fail "could not read the stream's last sequence after the restart"
+  replayed=$((end - start - rows))
   [ "$replayed" -lt $((published / 2)) ] \
     || fail "republished $replayed rows after the restart, of $published published before it; Debezium restarted the transaction"
   pass "$rows rows landed; $published published before the restart, $replayed extra messages after it"

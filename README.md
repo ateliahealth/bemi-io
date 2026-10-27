@@ -174,6 +174,14 @@ Two further variables control the slot itself: `BEMI_SLOT_NAME` (default
 startup. Resetting discards every change that has not yet been consumed — the
 compose gate uses it as a negative control precisely because it loses data.
 
+The slot is dropped by the stream-setup container (`dist/src/reset.js`), and
+it must finish before Debezium starts. Debezium discards its stored offsets only
+when it finds the slot missing at startup. A drop that lands after that check
+leaves offsets from the old slot on the volume, and every later start finds the
+new slot and keeps them. Compose orders this with
+`service_completed_successfully`; on Kubernetes, run stream-setup as an init
+container of the same pod rather than as a separate Job.
+
 ## Architecture
 
 ```mermaid
