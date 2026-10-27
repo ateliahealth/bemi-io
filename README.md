@@ -33,6 +33,9 @@ maintained by Atelia Health for self-hosting. See [License](#license).
   is down, so writes made during an outage still land afterwards. Debezium
   keeps its offsets in `/debezium/data`; mount a volume there, or a container
   restart partway through a large transaction replays it from the first row.
+  The image runs as uid 1000, so the volume must be writable by it: Docker
+  named volumes inherit that ownership, and on Kubernetes set `fsGroup: 1000`.
+  Debezium refuses to start if the directory is not writable.
 - Optional per-transaction application context (user, tenant, request) attached
   to the changes it caused.
 

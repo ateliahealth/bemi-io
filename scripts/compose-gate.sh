@@ -74,7 +74,10 @@ step_negative_control() {
   sleep 30
   after=$(count)
   [ "$after" = "$before" ] || fail "slot reset did not lose the writes ($before -> $after); the downtime test proves nothing"
-  pass "writes correctly lost after slot reset ($before -> $after)"
+  # Offsets from the dropped slot must not be resumed against the new one.
+  [ "$(docker logs bemi-debezium-1 2>&1 | grep -c 'discarding stored offsets')" -gt 0 ] \
+    || fail "Debezium kept offsets from the dropped slot"
+  pass "writes correctly lost after slot reset ($before -> $after), stale offsets discarded"
 }
 
 step_backpressure() {

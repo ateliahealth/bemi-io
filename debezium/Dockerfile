@@ -17,6 +17,11 @@ RUN apt-get update && \
 # which a 17 JRE refuses to load.
 FROM eclipse-temurin:21-jre-jammy
 
+# debezium.sh checks the replication slot exists before trusting stored offsets.
+RUN apt-get update && \
+  apt-get install -y --no-install-recommends postgresql-client && \
+  rm -rf /var/lib/apt/lists/*
+
 WORKDIR /debezium
 
 COPY --from=fetch /debezium-server ./debezium-server
