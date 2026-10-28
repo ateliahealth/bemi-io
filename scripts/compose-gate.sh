@@ -355,7 +355,7 @@ step_client_contract() {
   # cannot recover it and the failure message alone says nothing useful.
   pnpm --filter @atelia/pg-change-context run prisma:generate \
     || fail "could not generate the Prisma client"
-  DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:55432/appdb" \
+  DATABASE_URL="postgresql://postgres:pa%24word@127.0.0.1:55432/appdb" \
     pnpm --filter @atelia/pg-change-context run test:integration \
     || fail "the package does not work through a Prisma client"
   pass "package emits successfully through a real Prisma client"
@@ -368,7 +368,7 @@ step_context_pairing() {
   # both the source and the audit database.
   pnpm --filter @atelia/pg-change-context run prisma:generate >/dev/null 2>&1 \
     || fail "could not generate the Prisma client"
-  DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:55432/appdb" \
+  DATABASE_URL="postgresql://postgres:pa%24word@127.0.0.1:55432/appdb" \
     pnpm --filter @atelia/pg-change-context run test:pairing \
     || fail "the pairing writes did not complete"
 
