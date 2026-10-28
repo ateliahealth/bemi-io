@@ -50,7 +50,7 @@ fi &&
 # recreate of Debezium alone and a new pod all look alike from in here. It
 # assumes any drop has already happened, so stream-setup must complete before
 # this container starts; a drop after this check strands the old offsets.
-SLOT_COUNT=$(PGPASSWORD="${DB_PASSWORD}" PGCONNECT_TIMEOUT=10 psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" \
+SLOT_COUNT=$(PGPASSWORD="${DB_PASSWORD//\$\$/\$}" PGCONNECT_TIMEOUT=10 psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" \
   -tAc "select count(*) from pg_replication_slots where slot_name = '${BEMI_SLOT_NAME}'") || {
   echo "debezium: could not check for replication slot ${BEMI_SLOT_NAME}" >&2
   exit 1

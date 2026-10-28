@@ -7,14 +7,14 @@ x-source-env: &source-env
   DB_PORT: '5432'
   DB_NAME: appdb
   DB_USER: postgres
-  DB_PASSWORD: postgres
+  DB_PASSWORD: 'pa$$$$word'
 
 x-destination-env: &destination-env
   DESTINATION_DB_HOST: db
   DESTINATION_DB_PORT: '5432'
   DESTINATION_DB_NAME: audit
   DESTINATION_DB_USER: postgres
-  DESTINATION_DB_PASSWORD: postgres
+  DESTINATION_DB_PASSWORD: 'pa$$word'
 
 x-worker-image: &worker-image
   image: bemi-worker:local
@@ -34,7 +34,7 @@ services:
       - -c
       - max_wal_senders=10
     environment:
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: 'pa$$word'
       POSTGRES_DB: appdb
     ports:
       - '127.0.0.1:55432:5432'

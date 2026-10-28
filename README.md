@@ -88,6 +88,9 @@ Tear it down, including the volumes, with `docker compose down -v`.
 The source and destination are configured separately, so the change log can
 live in its own database:
 
+`DB_PASSWORD` is read through Debezium Server's Quarkus config, so a literal `$`
+in it is written `$$`. The other variables take the password as-is.
+
 | Variable                                                                                                              | Points at                                   |
 | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
 | `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`                                                             | The tracked database, read by Debezium      |
