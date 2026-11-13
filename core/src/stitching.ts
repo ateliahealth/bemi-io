@@ -24,11 +24,9 @@ export const stitchFetchedRecords = ({
   let newFetchedRecordBuffer = new FetchedRecordBuffer()
 
   fetchedRecordBuffer.forEach((subject, sortedFetchedRecords) => {
-    if (
-      sortedFetchedRecords.length &&
-      (!maxSequence || sortedFetchedRecords[sortedFetchedRecords.length - 1].streamSequence > maxSequence)
-    ) {
-      maxSequence = sortedFetchedRecords[sortedFetchedRecords.length - 1].streamSequence
+    const newestSubjectSequence = Math.max(...sortedFetchedRecords.map((r) => r.streamSequence))
+    if (sortedFetchedRecords.length && (!maxSequence || newestSubjectSequence > maxSequence)) {
+      maxSequence = newestSubjectSequence
     }
 
     let maxSubjectSequence: number | undefined = undefined
@@ -53,25 +51,27 @@ export const stitchFetchedRecords = ({
         useBuffer &&
         fetchedRecord.isChange() &&
         sameTransactionIdFetchedRecords.length === 1 &&
-        fetchedRecord === sortedFetchedRecords[sortedFetchedRecords.length - 1]
+        fetchedRecord.streamSequence === newestSubjectSequence
       ) {
         newFetchedRecordBuffer = newFetchedRecordBuffer.addFetchedRecord(fetchedRecord)
         return
       }
 
-      // Skip a context unless its change has not arrived: a change without
-      // context is savable, a context without its change is not. Keyed on the
-      // change arriving, not record count - two contexts (both emitters during
-      // a migration) counted as paired, so both were dropped.
       if (fetchedRecord.isContextMessage()) {
-        const changeArrived = sameTransactionIdFetchedRecords.some((r) => r.isChange())
+        const paired = fetchedRecord.paired || sameTransactionIdFetchedRecords.some((r) => r.isChange())
+        // Debezium publishes each transaction contiguously, in commit order rather than xid order.
+        const transactionEnded =
+          newestSubjectSequence > Math.max(...sameTransactionIdFetchedRecords.map((r) => r.streamSequence))
         // Dropped rather than held forever if its change never comes - a
         // transaction that wrote nothing, or wrote only to excluded tables.
         // Holding it clamps the ack, so the stream never purges and fills.
-        const orphaned =
+        const pastOrphanGap =
           maxSequence !== undefined && maxSequence - fetchedRecord.streamSequence > orphanContextSequenceGap
-        if (useBuffer && !changeArrived && !orphaned) {
-          newFetchedRecordBuffer = newFetchedRecordBuffer.addFetchedRecord(fetchedRecord)
+        const orphaned = !paired && (transactionEnded || pastOrphanGap)
+        if (useBuffer && !transactionEnded && !orphaned) {
+          newFetchedRecordBuffer = newFetchedRecordBuffer.addFetchedRecord(
+            paired && !fetchedRecord.paired ? fetchedRecord.asPaired() : fetchedRecord,
+          )
         } else if (orphaned) {
           logger.info(
             `Dropping context message #${fetchedRecord.streamSequence} whose change never arrived (stream at #${maxSequence})`,
@@ -98,8 +98,14 @@ export const stitchFetchedRecords = ({
     })
   })
 
+  const ackBlockingSequencesBySubject: { [subject: string]: number[] } = {}
+  newFetchedRecordBuffer.forEach((subject, records) => {
+    ackBlockingSequencesBySubject[subject] = records.filter((r) => !r.paired).map((r) => r.streamSequence)
+  })
+  const ackBlockingSequences = Object.values(ackBlockingSequencesBySubject).flat()
+
   let ackStreamSequence
-  if (newFetchedRecordBuffer.size()) {
+  if (ackBlockingSequences.length) {
     let subjectWithMaxSequence: string | undefined = undefined
     Object.keys(maxSequenceBySubject).forEach((subject) => {
       // Set an initial subject
@@ -110,7 +116,7 @@ export const stitchFetchedRecords = ({
       // If the previous subject has a lower sequence number and it doesn't have any messages in the buffer, use the new subject
       if (
         maxSequenceBySubject[subject] > maxSequenceBySubject[subjectWithMaxSequence] &&
-        newFetchedRecordBuffer.sizeBySubject(subjectWithMaxSequence) === 0
+        !ackBlockingSequencesBySubject[subjectWithMaxSequence]?.length
       ) {
         subjectWithMaxSequence = subject
       }
@@ -120,19 +126,12 @@ export const stitchFetchedRecords = ({
     ackStreamSequence = maxSequence
   }
 
-  // Never ack at or past anything left in the buffer. The ack drives the purge,
+  // Never ack at or past an unpaired record left in the buffer. The ack drives the purge,
   // so acking past a buffered record removes it from the stream while it exists
   // only in this process's memory - a restart before the next batch loses it.
   // Computed here rather than in the loop, because a record buffered early can
   // still be released later in the same pass.
-  let minBufferedSequence: number | undefined = undefined
-  newFetchedRecordBuffer.forEach((_subject, records) => {
-    records.forEach((record) => {
-      if (minBufferedSequence === undefined || record.streamSequence < minBufferedSequence) {
-        minBufferedSequence = record.streamSequence
-      }
-    })
-  })
+  const minBufferedSequence = ackBlockingSequences.length ? Math.min(...ackBlockingSequences) : undefined
   if (
     ackStreamSequence !== undefined &&
     minBufferedSequence !== undefined &&

@@ -73,7 +73,9 @@ describe('stitchFetchedRecords', () => {
           findFetchedRecord(fetchedRecords, 6).setContext(findFetchedRecord(fetchedRecords, 5).context()),
         ],
         ackStreamSequence: 6,
-        newFetchedRecordBuffer: new FetchedRecordBuffer(),
+        newFetchedRecordBuffer: new FetchedRecordBuffer().addFetchedRecords([
+          findFetchedRecord(fetchedRecords, 5).asPaired(),
+        ]),
       })
     })
 
@@ -115,7 +117,10 @@ describe('stitchFetchedRecords', () => {
           findFetchedRecord(fetchedRecords, 4).setContext(findFetchedRecord(fetchedRecords, 3).context()),
         ],
         ackStreamSequence: 4,
-        newFetchedRecordBuffer: new FetchedRecordBuffer(),
+        newFetchedRecordBuffer: new FetchedRecordBuffer().addFetchedRecords([
+          findFetchedRecord(fetchedRecords, 1).asPaired(),
+          findFetchedRecord(fetchedRecords, 3).asPaired(),
+        ]),
       })
     })
 
@@ -180,8 +185,8 @@ describe('stitchFetchedRecords', () => {
       })
     })
 
-    // A second, self-contained transaction so the trailing record is stitched
-    // and released rather than buffered as an unpaired change of its own.
+    // A second, self-contained transaction, ended by a heartbeat so its context
+    // is released and its change is not buffered as an unpaired one.
     const pairedTransaction = (subject: string, contextSequence: number, changeSequence: number) => [
       new FetchedRecord({
         subject,
@@ -193,6 +198,12 @@ describe('stitchFetchedRecords', () => {
         subject,
         streamSequence: changeSequence,
         changeAttributes: { ...CHANGE_ATTRIBUTES.CREATE, transactionId: 2 },
+      }),
+      new FetchedRecord({
+        subject,
+        streamSequence: changeSequence + 1,
+        changeAttributes: { ...CHANGE_ATTRIBUTES.HEARTBEAT_MESSAGE, transactionId: 3 },
+        messagePrefix: MESSAGE_PREFIX_HEARTBEAT,
       }),
     ]
 
@@ -216,10 +227,10 @@ describe('stitchFetchedRecords', () => {
       })
 
       expect(result.newFetchedRecordBuffer.size()).toEqual(0)
-      expect(result.ackStreamSequence).toEqual(5000)
+      expect(result.ackStreamSequence).toEqual(5001)
     })
 
-    test('keeps a context whose change has simply not caught up yet', () => {
+    test('drops an unpaired context once another transaction follows it, within the orphan gap', () => {
       const subject = 'bemi-subject'
       const records = [orphanContext(subject), ...pairedTransaction(subject, 19, 20)]
 
@@ -228,9 +239,8 @@ describe('stitchFetchedRecords', () => {
         useBuffer: true,
       })
 
-      expect(result.newFetchedRecordBuffer.size()).toEqual(1)
-      // Clamped below the buffered context so it is not purged from the stream.
-      expect(result.ackStreamSequence).toBeUndefined()
+      expect(result.newFetchedRecordBuffer.size()).toEqual(0)
+      expect(result.ackStreamSequence).toEqual(21)
     })
 
     test('buffers every context of a transaction whose change has not arrived', () => {
@@ -276,10 +286,13 @@ describe('stitchFetchedRecords', () => {
 
       expect(secondBatch.stitchedFetchedRecords).toHaveLength(1)
       expect(secondBatch.stitchedFetchedRecords[0].context()).toStrictEqual(contexts[0].context())
-      expect(secondBatch.newFetchedRecordBuffer.size()).toEqual(0)
+      expect(secondBatch.newFetchedRecordBuffer).toStrictEqual(
+        new FetchedRecordBuffer().addFetchedRecords(contexts.map((context) => context.asPaired())),
+      )
+      expect(secondBatch.ackStreamSequence).toEqual(3)
     })
 
-    test('buffers an unpaired context even when a heartbeat follows it', () => {
+    test('drops an unpaired context once a heartbeat follows it', () => {
       const subject = 'bemi-subject'
       const fetchedRecords = [
         new FetchedRecord({
@@ -301,16 +314,9 @@ describe('stitchFetchedRecords', () => {
         useBuffer: true,
       })
 
-      // The context must survive into the next batch. Acking the heartbeat
-      // purges everything below it, so a context dropped here is gone and the
-      // change it belongs to is later saved with no application context.
-      expect(result.newFetchedRecordBuffer).toStrictEqual(
-        new FetchedRecordBuffer().addFetchedRecords([findFetchedRecord(fetchedRecords, 1)]),
-      )
+      expect(result.newFetchedRecordBuffer).toStrictEqual(new FetchedRecordBuffer())
       expect(result.stitchedFetchedRecords).toStrictEqual([])
-      // Nothing may be acked: the buffered context is only in memory until the
-      // next batch, so purging it from the stream would lose it on a restart.
-      expect(result.ackStreamSequence).toBeUndefined()
+      expect(result.ackStreamSequence).toEqual(2)
     })
 
     test('acks the last heartbeat message if the buffer is empty', () => {
@@ -389,7 +395,10 @@ describe('stitchFetchedRecords', () => {
           findFetchedRecord(fetchedRecords, 2).setContext(findFetchedRecord(fetchedRecords, 1).context()),
         ],
         ackStreamSequence: 3,
-        newFetchedRecordBuffer: new FetchedRecordBuffer().addFetchedRecords([findFetchedRecord(fetchedRecords, 4)]),
+        newFetchedRecordBuffer: new FetchedRecordBuffer().addFetchedRecords([
+          findFetchedRecord(fetchedRecords, 1).asPaired(),
+          findFetchedRecord(fetchedRecords, 4),
+        ]),
       })
     })
 
@@ -431,7 +440,10 @@ describe('stitchFetchedRecords', () => {
           findFetchedRecord(fetchedRecords, 2).setContext(findFetchedRecord(fetchedRecords, 1).context()),
         ],
         ackStreamSequence: 3,
-        newFetchedRecordBuffer: new FetchedRecordBuffer().addFetchedRecords([findFetchedRecord(fetchedRecords, 4)]),
+        newFetchedRecordBuffer: new FetchedRecordBuffer().addFetchedRecords([
+          findFetchedRecord(fetchedRecords, 1).asPaired(),
+          findFetchedRecord(fetchedRecords, 4),
+        ]),
       })
     })
 
@@ -464,7 +476,9 @@ describe('stitchFetchedRecords', () => {
           findFetchedRecord(fetchedRecords, 2).setContext(findFetchedRecord(fetchedRecords, 1).context()),
         ],
         ackStreamSequence: 3,
-        newFetchedRecordBuffer: new FetchedRecordBuffer(),
+        newFetchedRecordBuffer: new FetchedRecordBuffer().addFetchedRecords([
+          findFetchedRecord(fetchedRecords, 1).asPaired(),
+        ]),
       })
     })
   })
@@ -598,6 +612,154 @@ describe('stitchFetchedRecords', () => {
         ackStreamSequence: 2,
         newFetchedRecordBuffer: new FetchedRecordBuffer(),
       })
+    })
+  })
+
+  describe('when a transaction is split across batches', () => {
+    const subject = 'bemi-subject'
+
+    const context = (streamSequence: number, transactionId: number) =>
+      new FetchedRecord({
+        subject,
+        streamSequence,
+        changeAttributes: { ...CHANGE_ATTRIBUTES.CREATE_MESSAGE, transactionId },
+        messagePrefix: MESSAGE_PREFIX_CONTEXT,
+      })
+
+    const change = (streamSequence: number, transactionId: number) =>
+      new FetchedRecord({
+        subject,
+        streamSequence,
+        changeAttributes: { ...CHANGE_ATTRIBUTES.CREATE, transactionId },
+      })
+
+    const heartbeat = (streamSequence: number, transactionId: number) =>
+      new FetchedRecord({
+        subject,
+        streamSequence,
+        changeAttributes: { ...CHANGE_ATTRIBUTES.HEARTBEAT_MESSAGE, transactionId },
+        messagePrefix: MESSAGE_PREFIX_HEARTBEAT,
+      })
+
+    const runBatches = (batches: FetchedRecord[][], options: { orphanContextSequenceGap?: number } = {}) => {
+      let buffer = new FetchedRecordBuffer()
+      const saved: FetchedRecord[] = []
+      const acks: (number | undefined)[] = []
+      batches.forEach((batch) => {
+        const result = stitchFetchedRecords({
+          fetchedRecordBuffer: buffer.addFetchedRecords(batch),
+          useBuffer: true,
+          ...options,
+        })
+        buffer = result.newFetchedRecordBuffer
+        saved.push(...result.stitchedFetchedRecords)
+        acks.push(result.ackStreamSequence)
+      })
+      return { contextBySequence: new Map(saved.map((r) => [r.streamSequence, r.context()])), acks, buffer }
+    }
+
+    test('stitches the changes in the next batch with the context from the previous one', () => {
+      const ctx = context(1, 500)
+      const { contextBySequence, acks } = runBatches([
+        [ctx, change(2, 500)],
+        [change(3, 500), context(4, 501), change(5, 501)],
+      ])
+
+      expect(contextBySequence.get(2)).toStrictEqual(ctx.context())
+      expect(contextBySequence.get(3)).toStrictEqual(ctx.context())
+      expect(acks).toStrictEqual([2, 5])
+    })
+
+    test('stitches the changes in the next batch when the context ends the previous one', () => {
+      const ctx = context(2, 500)
+      const { contextBySequence } = runBatches([
+        [change(1, 499), ctx],
+        [change(3, 500), change(4, 500), change(5, 501)],
+      ])
+
+      expect(contextBySequence.get(3)).toStrictEqual(ctx.context())
+      expect(contextBySequence.get(4)).toStrictEqual(ctx.context())
+    })
+
+    test('keeps the context across several batches without holding back the ack', () => {
+      const ctx = context(1, 500)
+      const { contextBySequence, acks, buffer } = runBatches([
+        [ctx, change(2, 500)],
+        [change(3, 500), change(4, 500)],
+        [change(5, 500), heartbeat(6, 501)],
+      ])
+
+      ;[2, 3, 4, 5].forEach((sequence) => expect(contextBySequence.get(sequence)).toStrictEqual(ctx.context()))
+      expect(acks).toStrictEqual([2, 4, 6])
+      expect(buffer.size()).toEqual(0)
+    })
+
+    test('carries the same held context object across batches instead of re-wrapping it', () => {
+      const first = stitchFetchedRecords({
+        fetchedRecordBuffer: new FetchedRecordBuffer().addFetchedRecords([context(1, 500), change(2, 500)]),
+        useBuffer: true,
+      })
+      const second = stitchFetchedRecords({
+        fetchedRecordBuffer: first.newFetchedRecordBuffer.addFetchedRecords([change(3, 500)]),
+        useBuffer: true,
+      })
+
+      const held = (result: typeof first) =>
+        result.newFetchedRecordBuffer.fetchedRecordsByTransactionId(subject, '500').find((r) => r.isContextMessage())
+      expect(held(second)).toBe(held(first))
+    })
+
+    test('releases the context of a transaction that ended exactly at the batch boundary', () => {
+      const { acks, buffer } = runBatches([[context(1, 500), change(2, 500)], [heartbeat(3, 501)]])
+
+      expect(acks).toStrictEqual([2, 3])
+      expect(buffer.size()).toEqual(0)
+    })
+
+    test('tells the transaction ended by stream order, not by transaction id', () => {
+      const ctx = context(3, 500)
+      const { contextBySequence } = runBatches([
+        [context(1, 600), change(2, 600), ctx, change(4, 500)],
+        [change(5, 500), heartbeat(6, 700)],
+      ])
+
+      expect(contextBySequence.get(4)).toStrictEqual(ctx.context())
+      expect(contextBySequence.get(5)).toStrictEqual(ctx.context())
+    })
+
+    test('does not age out the context of a transaction larger than the orphan gap', () => {
+      const ctx = context(1, 500)
+      const { contextBySequence } = runBatches(
+        [
+          [ctx, change(2, 500), change(3, 500), change(4, 500)],
+          [change(5, 500), change(6, 500), heartbeat(7, 501)],
+        ],
+        { orphanContextSequenceGap: 2 },
+      )
+
+      ;[2, 3, 4, 5, 6].forEach((sequence) => expect(contextBySequence.get(sequence)).toStrictEqual(ctx.context()))
+    })
+
+    test('buffers the newest unpaired change by stream order, not by transaction id', () => {
+      const result = stitchFetchedRecords({
+        fetchedRecordBuffer: new FetchedRecordBuffer().addFetchedRecords([change(1, 900), change(2, 500)]),
+        useBuffer: true,
+      })
+
+      expect(result.stitchedFetchedRecords.map((r) => r.streamSequence)).toStrictEqual([1])
+      expect(result.newFetchedRecordBuffer.size()).toEqual(1)
+      expect(result.newFetchedRecordBuffer.fetchedRecordsByTransactionId(subject, '500')).toHaveLength(1)
+      expect(result.ackStreamSequence).toEqual(1)
+    })
+
+    test('acks the newest record by stream order, not by transaction id', () => {
+      const result = stitchFetchedRecords({
+        fetchedRecordBuffer: new FetchedRecordBuffer().addFetchedRecords([change(1, 600), heartbeat(2, 550)]),
+        useBuffer: true,
+      })
+
+      expect(result.stitchedFetchedRecords.map((r) => r.streamSequence)).toStrictEqual([1])
+      expect(result.ackStreamSequence).toEqual(2)
     })
   })
 })
