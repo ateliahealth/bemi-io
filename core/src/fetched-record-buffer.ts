@@ -65,10 +65,6 @@ export class FetchedRecordBuffer {
     return this.store[subject]?.[transactionId] || []
   }
 
-  sizeBySubject(subject: string) {
-    return Object.values(this.store[subject] || {}).flat().length
-  }
-
   size() {
     return Object.values(this.store)
       .map((fetchedRecsByPos) => Object.values(fetchedRecsByPos).flat().length)

@@ -145,6 +145,7 @@ const pollReplicationSlots = (orm: MikroORM) => {
   await runIngestionLoop({
     orm,
     consumer,
+    useBuffer: true,
     ignoreFields: IGNORE_FIELDS,
     onTick: () => {
       lastTickAt = Date.now()

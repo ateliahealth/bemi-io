@@ -69,6 +69,7 @@ export class FetchedRecord {
   subject: string
   streamSequence: number
   messagePrefix?: string
+  paired = false
 
   constructor({
     changeAttributes,
@@ -131,6 +132,12 @@ export class FetchedRecord {
   setContext(context: object) {
     const newFetchedRecord = Object.assign(Object.create(this), this)
     newFetchedRecord.changeAttributes = { ...this.changeAttributes, context }
+    return newFetchedRecord
+  }
+
+  asPaired() {
+    const newFetchedRecord = Object.assign(Object.create(this), this)
+    newFetchedRecord.paired = true
     return newFetchedRecord
   }
 
